@@ -16,7 +16,6 @@ import (
 	"github.com/dracory/sb"
 	"github.com/dromara/carbon/v2"
 	"github.com/georgysavva/scany/sqlscan"
-	"github.com/samber/lo"
 	"github.com/spf13/cast"
 )
 
@@ -35,6 +34,7 @@ type store struct {
 	automigrateEnabled bool
 	debugEnabled       bool
 	sqlLogger          *slog.Logger
+	encryptor          *sessionEncryptor
 }
 
 // PUBLIC METHODS ============================================================
@@ -291,7 +291,11 @@ func (st *store) Get(ctx context.Context, sessionKey string, valueDefault string
 	}
 
 	if session != nil {
-		return session.GetValue(), nil
+		decrypted, err := st.decryptValue(session.GetValue())
+		if err != nil {
+			return "", err
+		}
+		return decrypted, nil
 	}
 
 	return valueDefault, nil
@@ -316,7 +320,10 @@ func (st *store) GetAny(ctx context.Context, key string, valueDefault interface{
 	}
 
 	if session != nil {
-		jsonValue := session.GetValue()
+		jsonValue, errDecrypt := st.decryptValue(session.GetValue())
+		if errDecrypt != nil {
+			return valueDefault, errDecrypt
+		}
 		var val interface{}
 		jsonError := json.Unmarshal([]byte(jsonValue), &val)
 		if jsonError != nil {
@@ -348,7 +355,10 @@ func (st *store) GetMap(ctx context.Context, key string, valueDefault map[string
 	}
 
 	if session != nil {
-		jsonValue := session.GetValue()
+		jsonValue, errDecrypt := st.decryptValue(session.GetValue())
+		if errDecrypt != nil {
+			return valueDefault, errDecrypt
+		}
 		var val map[string]any
 		jsonError := json.Unmarshal([]byte(jsonValue), &val)
 		if jsonError != nil {
@@ -517,7 +527,20 @@ func (st *store) SessionCreate(ctx context.Context, session SessionInterface) er
 		session.SetSoftDeletedAt(sb.MAX_DATETIME)
 	}
 
-	data := session.Data()
+	originalData := session.Data()
+	data := make(map[string]interface{}, len(originalData))
+
+	for key, value := range originalData {
+		if key == COLUMN_SESSION_VALUE {
+			encryptedValue, err := st.encryptValue(value)
+			if err != nil {
+				return err
+			}
+			data[key] = encryptedValue
+			continue
+		}
+		data[key] = value
+	}
 
 	sqlStr, sqlParams, sqlErr := goqu.Dialect(st.dbDriverName).
 		Insert(st.sessionTableName).
@@ -748,12 +771,19 @@ func (store *store) SessionList(ctx context.Context, query SessionQueryInterface
 		return []SessionInterface{}, err
 	}
 
-	list := []SessionInterface{}
+	list := make([]SessionInterface, 0, len(modelMaps))
 
-	lo.ForEach(modelMaps, func(modelMap map[string]string, index int) {
+	for _, modelMap := range modelMaps {
+		decryptedValue, err := store.decryptValue(modelMap[COLUMN_SESSION_VALUE])
+		if err != nil {
+			return []SessionInterface{}, err
+		}
+
+		modelMap[COLUMN_SESSION_VALUE] = decryptedValue
+
 		model := NewSessionFromExistingData(modelMap)
 		list = append(list, model)
-	})
+	}
 
 	return list, nil
 }
@@ -825,12 +855,26 @@ func (store *store) SessionUpdate(ctx context.Context, session SessionInterface)
 
 	delete(dataChanged, COLUMN_ID) // ID cannot be updated
 
+	updateData := make(map[string]interface{}, len(dataChanged))
+
+	for key, value := range dataChanged {
+		if key == COLUMN_SESSION_VALUE {
+			encryptedValue, err := store.encryptValue(value)
+			if err != nil {
+				return err
+			}
+			updateData[key] = encryptedValue
+			continue
+		}
+		updateData[key] = value
+	}
+
 	sqlStr, sqlParams, sqlErr := goqu.Dialect(store.dbDriverName).
 		Update(store.sessionTableName).
 		Prepared(true).
 		Where(goqu.C(COLUMN_SESSION_KEY).Eq(session.GetKey())).
 		Where(goqu.C(COLUMN_ID).Eq(session.GetID())).
-		Set(dataChanged).
+		Set(updateData).
 		ToSQL()
 
 	if sqlErr != nil {
@@ -1046,4 +1090,20 @@ func (store *store) logSql(sqlOperationType string, sql string, params ...interf
 	if store.sqlLogger != nil {
 		store.sqlLogger.Debug("sql: "+sqlOperationType, slog.String("sql", sql), slog.Any("params", params))
 	}
+}
+
+func (store *store) encryptValue(value string) (string, error) {
+	if store == nil || store.encryptor == nil {
+		return value, nil
+	}
+
+	return store.encryptor.encrypt(value)
+}
+
+func (store *store) decryptValue(value string) (string, error) {
+	if store == nil || store.encryptor == nil {
+		return value, nil
+	}
+
+	return store.encryptor.decrypt(value)
 }

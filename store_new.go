@@ -18,6 +18,7 @@ type NewStoreOptions struct {
 	AutomigrateEnabled bool
 	DebugEnabled       bool
 	SqlLogger          *slog.Logger
+	SessionEncryption  *SessionEncryptionOptions
 }
 
 // NewStore creates a new session store
@@ -31,6 +32,14 @@ func NewStore(opts NewStoreOptions) (*store, error) {
 		timeoutSeconds:     opts.TimeoutSeconds,
 		sqlLogger:          opts.SqlLogger,
 	}
+
+	encryptor, err := newSessionEncryptor(opts.SessionEncryption)
+
+	if err != nil {
+		return nil, err
+	}
+
+	store.encryptor = encryptor
 
 	if store.sessionTableName == "" {
 		return nil, errors.New("session store: sessionTableName is required")
