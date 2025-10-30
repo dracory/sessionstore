@@ -33,14 +33,7 @@ func initDB(filepath string) (*sql.DB, error) {
 }
 
 func initStore(filepath string) (StoreInterface, error) {
-	db, err := initDB(filepath)
-
-	if err != nil {
-		return nil, err
-	}
-
-	store, err := NewStore(NewStoreOptions{
-		DB:                 db,
+	store, err := initStoreWithOptions(filepath, NewStoreOptions{
 		SessionTableName:   "session",
 		AutomigrateEnabled: true,
 	})
@@ -49,7 +42,31 @@ func initStore(filepath string) (StoreInterface, error) {
 		return nil, err
 	}
 
+	return store, nil
+}
+
+func initStoreWithOptions(filepath string, opts NewStoreOptions) (*store, error) {
+	db, err := initDB(filepath)
+
+	if err != nil {
+		return nil, err
+	}
+
+	opts.DB = db
+
+	if opts.SessionTableName == "" {
+		opts.SessionTableName = "session"
+	}
+
+	store, err := NewStore(opts)
+
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+
 	if store == nil {
+		db.Close()
 		return nil, errors.New("unexpected nil store")
 	}
 
@@ -675,5 +692,127 @@ func TestStore_SessionUpdate(t *testing.T) {
 
 	if sessionFound.GetValue() != "one two three" {
 		t.Fatal("Value MUST be 'one two three', found: ", sessionFound.GetValue())
+	}
+}
+
+func TestStore_SetGetWithoutEncryption(t *testing.T) {
+	store, err := initStoreWithOptions(":memory:", NewStoreOptions{
+		SessionTableName:   "session",
+		AutomigrateEnabled: true,
+	})
+
+	if err != nil {
+		t.Fatal("Store could not be created: ", err.Error())
+	}
+
+	defer store.db.Close()
+
+	sessionKey := "plain-key"
+	value := "plain-value"
+
+	if err := store.Set(context.Background(), sessionKey, value, 60, SessionOptions()); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	got, err := store.Get(context.Background(), sessionKey, "", SessionOptions())
+
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+
+	if got != value {
+		t.Fatalf("expected value %q, got %q", value, got)
+	}
+
+	var raw string
+	rowErr := store.db.QueryRow("SELECT session_value FROM session WHERE session_key = ?", sessionKey).Scan(&raw)
+
+	if rowErr != nil {
+		t.Fatalf("failed to query raw value: %v", rowErr)
+	}
+
+	if raw != value {
+		t.Fatalf("expected raw stored value %q, got %q", value, raw)
+	}
+}
+
+func TestStore_SetGetWithEncryption(t *testing.T) {
+	encryptionKey := []byte("0123456789abcdef0123456789abcdef")
+
+	store, err := initStoreWithOptions(":memory:", NewStoreOptions{
+		SessionTableName:   "session",
+		AutomigrateEnabled: true,
+		EncryptionEnabled:  true,
+		EncryptionKey:      encryptionKey,
+	})
+
+	if err != nil {
+		t.Fatal("Store could not be created: ", err.Error())
+	}
+
+	defer store.db.Close()
+
+	sessionKey := "encrypted-key"
+	value := "emoji 😀 and json {\"foo\":\"bar\"}"
+
+	if err := store.Set(context.Background(), sessionKey, value, 60, SessionOptions()); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	got, err := store.Get(context.Background(), sessionKey, "", SessionOptions())
+
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+
+	if got != value {
+		t.Fatalf("expected value %q, got %q", value, got)
+	}
+
+	sessionFound, err := store.FindByKey(context.Background(), sessionKey, SessionOptions())
+	if err != nil {
+		t.Fatalf("FindByKey failed: %v", err)
+	}
+
+	if sessionFound == nil {
+		t.Fatal("expected session to be found")
+	}
+
+	if sessionFound.GetValue() != value {
+		t.Fatalf("expected session value %q, got %q", value, sessionFound.GetValue())
+	}
+
+	var raw string
+	rowErr := store.db.QueryRow("SELECT session_value FROM session WHERE session_key = ?", sessionKey).Scan(&raw)
+
+	if rowErr != nil {
+		t.Fatalf("failed to query raw value: %v", rowErr)
+	}
+
+	if raw == value {
+		t.Fatalf("expected stored value to be encrypted, but matched plaintext")
+	}
+
+	if !strings.HasPrefix(raw, encryptedValuePrefix) {
+		t.Fatalf("expected stored value to have encryption prefix, got %q", raw)
+	}
+}
+
+func TestNewStore_EncryptionEnabledWithoutKey(t *testing.T) {
+	store, err := initStoreWithOptions(":memory:", NewStoreOptions{
+		SessionTableName:   "session",
+		AutomigrateEnabled: true,
+		EncryptionEnabled:  true,
+	})
+
+	if err == nil {
+		if store != nil {
+			store.db.Close()
+		}
+		t.Fatal("expected error when encryption enabled without key")
+	}
+
+	if !strings.Contains(err.Error(), "encryption key is required") {
+		t.Fatalf("unexpected error message: %v", err)
 	}
 }

@@ -12,22 +12,12 @@ import (
 
 const encryptedValuePrefix = "enc:v1:"
 
-// SessionEncryptionOptions configure encryption for session values.
-type SessionEncryptionOptions struct {
-	Enabled bool
-	Key     []byte
-}
-
-func newSessionEncryptor(opts *SessionEncryptionOptions) (*sessionEncryptor, error) {
-	if opts == nil || !opts.Enabled {
+func newSessionEncryptor(key []byte) (*sessionEncryptor, error) {
+	if len(key) == 0 {
 		return nil, nil
 	}
 
-	if len(opts.Key) == 0 {
-		return nil, errors.New("session store: encryption key is required when encryption is enabled")
-	}
-
-	block, err := aes.NewCipher(opts.Key)
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, fmt.Errorf("session store: create encryption cipher: %w", err)
 	}
@@ -46,7 +36,7 @@ type sessionEncryptor struct {
 
 func (s *sessionEncryptor) encrypt(value string) (string, error) {
 	if s == nil || s.aead == nil {
-		return value, nil
+		return "", errors.New("session store: encryptor is not initialised")
 	}
 
 	nonce := make([]byte, s.aead.NonceSize())
@@ -67,7 +57,7 @@ func (s *sessionEncryptor) encrypt(value string) (string, error) {
 
 func (s *sessionEncryptor) decrypt(value string) (string, error) {
 	if s == nil || s.aead == nil {
-		return value, nil
+		return "", errors.New("session store: encryptor is not initialised")
 	}
 
 	if value == "" {
