@@ -12,26 +12,16 @@ require (
 )
 
 require (
-	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/google/uuid v1.6.0 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/ncruces/go-strftime v0.1.9 // indirect
-	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	golang.org/x/crypto v0.43.0 // indirect
-	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
-	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
-	modernc.org/libc v1.66.8 // indirect
-	modernc.org/mathutil v1.7.1 // indirect
-	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.38.2 // indirect
+	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 )
 
 require (
 	github.com/dracory/str v0.17.0
 	github.com/dromara/carbon/v2 v2.6.14
-	github.com/glebarez/go-sqlite v1.22.0
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/samber/lo v1.52.0
 	github.com/spf13/cast v1.10.0
