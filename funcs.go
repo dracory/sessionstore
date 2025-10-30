@@ -8,7 +8,11 @@ import (
 
 func generateSessionKey(keyLength int) string {
 	gamma := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	return str.RandomFromGamma(keyLength, gamma)
+	key, err := str.RandomFromGamma(keyLength, gamma)
+	if err != nil {
+		key = str.Random(32)
+	}
+	return key
 }
 
 // fileExists checks if a file exists
