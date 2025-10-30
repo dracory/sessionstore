@@ -1,6 +1,6 @@
 module github.com/dracory/sessionstore
 
-go 1.24.6
+go 1.25
 
 require (
 	github.com/doug-martin/goqu/v9 v9.19.0
