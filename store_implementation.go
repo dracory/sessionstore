@@ -21,12 +21,12 @@ import (
 
 // == INTERFACE ===============================================================
 
-var _ StoreInterface = (*store)(nil) // verify it extends the store interface
+var _ StoreInterface = (*storeImplementation)(nil) // verify it extends the store interface
 
 // == TYPE ====================================================================
 
 // Store defines a session store
-type store struct {
+type storeImplementation struct {
 	sessionTableName   string
 	db                 *sql.DB
 	dbDriverName       string
@@ -46,18 +46,18 @@ type store struct {
 //
 // Returns:
 //   - error - nil if successful, otherwise an error
-func (store *store) AutoMigrate(ctx context.Context) error {
-	sqlStr := store.SQLCreateTable()
+func (st *storeImplementation) AutoMigrate(ctx context.Context) error {
+	sqlStr := st.SQLCreateTable()
 
 	if sqlStr == "" {
 		return errors.New("session store: table create sql is empty")
 	}
 
-	if store.db == nil {
+	if st.db == nil {
 		return errors.New("session store: database is nil")
 	}
 
-	_, err := database.Execute(database.Context(ctx, store.db), sqlStr)
+	_, err := database.Execute(database.Context(ctx, st.db), sqlStr)
 
 	if err != nil {
 		return err
@@ -75,8 +75,13 @@ func (store *store) AutoMigrate(ctx context.Context) error {
 //
 // Returns:
 //   - void
-func (st *store) EnableDebug(debug bool) {
+func (st *storeImplementation) EnableDebug(debug bool) {
 	st.debugEnabled = debug
+}
+
+// GetDB returns the database connection
+func (st *storeImplementation) GetDB() *sql.DB {
+	return st.db
 }
 
 // SessionExpiryGoroutine this is a goroutine that deletes expired sessions
@@ -91,7 +96,7 @@ func (st *store) EnableDebug(debug bool) {
 //
 // Returns:
 //   - error - nil if successful, otherwise an error
-func (st *store) SessionExpiryGoroutine(ctx context.Context) error {
+func (st *storeImplementation) SessionExpiryGoroutine(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -121,7 +126,7 @@ func (st *store) SessionExpiryGoroutine(ctx context.Context) error {
 	}
 }
 
-func (st *store) expireSessionsOnce(ctx context.Context) error {
+func (st *storeImplementation) expireSessionsOnce(ctx context.Context) error {
 	if st.debugEnabled {
 		log.Println("Cleaning expired sessions...")
 	}
@@ -175,7 +180,7 @@ func (st *store) expireSessionsOnce(ctx context.Context) error {
 //
 // Returns:
 //   - error - nil if successful, otherwise an error
-func (store *store) Extend(ctx context.Context, sessionKey string, seconds int64, options SessionOptionsInterface) error {
+func (store *storeImplementation) Extend(ctx context.Context, sessionKey string, seconds int64, options SessionOptionsInterface) error {
 	session, errFindByKey := store.FindByKey(ctx, sessionKey, options)
 
 	if errFindByKey != nil {
@@ -208,7 +213,7 @@ func (store *store) Extend(ctx context.Context, sessionKey string, seconds int64
 //
 // Returns:
 //   - error - nil if successful, otherwise an error
-func (st *store) Delete(ctx context.Context, sessionKey string, options SessionOptionsInterface) error {
+func (st *storeImplementation) Delete(ctx context.Context, sessionKey string, options SessionOptionsInterface) error {
 	wheres := []goqu.Expression{
 		goqu.C(COLUMN_SESSION_KEY).Eq(sessionKey),
 	}
@@ -268,7 +273,7 @@ func (st *store) Delete(ctx context.Context, sessionKey string, options SessionO
 // Returns:
 //   - SessionInterface - the found session
 //   - error - nil if successful, otherwise an error
-func (store *store) FindByKey(ctx context.Context, sessionKey string, options SessionOptionsInterface) (SessionInterface, error) {
+func (st *storeImplementation) FindByKey(ctx context.Context, sessionKey string, options SessionOptionsInterface) (SessionInterface, error) {
 	if sessionKey == "" {
 		return nil, errors.New("session store > find by key: session key is required")
 	}
@@ -290,7 +295,7 @@ func (store *store) FindByKey(ctx context.Context, sessionKey string, options Se
 		query.SetUserID(options.GetUserID())
 	}
 
-	list, err := store.SessionList(ctx, query)
+	list, err := st.SessionList(ctx, query)
 
 	if err != nil {
 		return nil, err
@@ -316,7 +321,7 @@ func (store *store) FindByKey(ctx context.Context, sessionKey string, options Se
 // Returns:
 //   - string - the session value
 //   - error - nil if successful, otherwise an error
-func (st *store) Get(ctx context.Context, sessionKey string, valueDefault string, options SessionOptionsInterface) (string, error) {
+func (st *storeImplementation) Get(ctx context.Context, sessionKey string, valueDefault string, options SessionOptionsInterface) (string, error) {
 	session, errFindByKey := st.FindByKey(ctx, sessionKey, options)
 
 	if errFindByKey != nil {
@@ -345,7 +350,7 @@ func (st *store) Get(ctx context.Context, sessionKey string, valueDefault string
 // Returns:
 //   - interface{} - the parsed value
 //   - error - nil if successful, otherwise an error
-func (st *store) GetAny(ctx context.Context, key string, valueDefault interface{}, options SessionOptionsInterface) (interface{}, error) {
+func (st *storeImplementation) GetAny(ctx context.Context, key string, valueDefault interface{}, options SessionOptionsInterface) (interface{}, error) {
 	session, errFindByKey := st.FindByKey(ctx, key, options)
 
 	if errFindByKey != nil {
@@ -380,7 +385,7 @@ func (st *store) GetAny(ctx context.Context, key string, valueDefault interface{
 // Returns:
 //   - map[string]any - the parsed map
 //   - error - nil if successful, otherwise an error
-func (st *store) GetMap(ctx context.Context, key string, valueDefault map[string]any, options SessionOptionsInterface) (map[string]any, error) {
+func (st *storeImplementation) GetMap(ctx context.Context, key string, valueDefault map[string]any, options SessionOptionsInterface) (map[string]any, error) {
 	session, errFindByKey := st.FindByKey(ctx, key, options)
 
 	if errFindByKey != nil {
@@ -414,7 +419,7 @@ func (st *store) GetMap(ctx context.Context, key string, valueDefault map[string
 // Returns:
 //   - bool - true if session exists, false otherwise
 //   - error - nil if successful, otherwise an error
-func (store *store) Has(ctx context.Context, sessionKey string, options SessionOptionsInterface) (bool, error) {
+func (st *storeImplementation) Has(ctx context.Context, sessionKey string, options SessionOptionsInterface) (bool, error) {
 	if sessionKey == "" {
 		return false, errors.New("session store > find by key: session key is required")
 	}
@@ -436,7 +441,7 @@ func (store *store) Has(ctx context.Context, sessionKey string, options SessionO
 		query.SetUserID(options.GetUserID())
 	}
 
-	count, err := store.SessionCount(ctx, query)
+	count, err := st.SessionCount(ctx, query)
 
 	if err != nil {
 		return false, err
@@ -456,7 +461,7 @@ func (store *store) Has(ctx context.Context, sessionKey string, options SessionO
 //
 // Returns:
 //   - error - nil if successful, otherwise an error
-func (st *store) MergeMap(ctx context.Context, key string, mergeMap map[string]any, seconds int64, options SessionOptionsInterface) error {
+func (st *storeImplementation) MergeMap(ctx context.Context, key string, mergeMap map[string]any, seconds int64, options SessionOptionsInterface) error {
 	currentMap, err := st.GetMap(ctx, key, nil, options)
 
 	if err != nil {
@@ -483,10 +488,10 @@ func (st *store) MergeMap(ctx context.Context, key string, mergeMap map[string]a
 // Returns:
 //   - int64 - the count of matching sessions
 //   - error - nil if successful, otherwise an error
-func (store *store) SessionCount(ctx context.Context, query SessionQueryInterface) (int64, error) {
+func (st *storeImplementation) SessionCount(ctx context.Context, query SessionQueryInterface) (int64, error) {
 	query.SetCountOnly(true)
 
-	q, _, err := store.sessionSelectQuery(query)
+	q, _, err := st.sessionSelectQuery(query)
 
 	if err != nil {
 		return -1, err
@@ -501,11 +506,11 @@ func (store *store) SessionCount(ctx context.Context, query SessionQueryInterfac
 		return -1, nil
 	}
 
-	if store.debugEnabled {
+	if st.debugEnabled {
 		log.Println(sqlStr)
 	}
 
-	mapped, err := database.SelectToMapString(database.Context(ctx, store.db), sqlStr, params...)
+	mapped, err := database.SelectToMapString(database.Context(ctx, st.db), sqlStr, params...)
 
 	if err != nil {
 		return -1, err
@@ -535,7 +540,7 @@ func (store *store) SessionCount(ctx context.Context, query SessionQueryInterfac
 //
 // Returns:
 //   - error - nil if successful, otherwise an error
-func (st *store) SessionCreate(ctx context.Context, session SessionInterface) error {
+func (st *storeImplementation) SessionCreate(ctx context.Context, session SessionInterface) error {
 	if session == nil {
 		return errors.New("sessionstore > session create. session cannot be nil")
 	}
@@ -606,7 +611,7 @@ func (st *store) SessionCreate(ctx context.Context, session SessionInterface) er
 //
 // Returns:
 //   - error - nil if successful, otherwise an error
-func (store *store) SessionDelete(ctx context.Context, session SessionInterface) error {
+func (st *storeImplementation) SessionDelete(ctx context.Context, session SessionInterface) error {
 	if ctx == nil {
 		return errors.New("ctx is nil")
 	}
@@ -615,7 +620,7 @@ func (store *store) SessionDelete(ctx context.Context, session SessionInterface)
 		return errors.New("session is nil")
 	}
 
-	return store.SessionDeleteByID(ctx, session.GetID())
+	return st.SessionDeleteByID(ctx, session.GetID())
 }
 
 // SessionDeleteByID deletes a session by id.
@@ -626,7 +631,7 @@ func (store *store) SessionDelete(ctx context.Context, session SessionInterface)
 //
 // Returns:
 //   - error - nil if successful, otherwise an error
-func (store *store) SessionDeleteByID(ctx context.Context, id string) error {
+func (st *storeImplementation) SessionDeleteByID(ctx context.Context, id string) error {
 	if ctx == nil {
 		return errors.New("ctx is nil")
 	}
@@ -635,8 +640,8 @@ func (store *store) SessionDeleteByID(ctx context.Context, id string) error {
 		return errors.New("session id is empty")
 	}
 
-	sqlStr, params, errSql := goqu.Dialect(store.dbDriverName).
-		Delete(store.sessionTableName).
+	sqlStr, params, errSql := goqu.Dialect(st.dbDriverName).
+		Delete(st.sessionTableName).
 		Prepared(true).
 		Where(goqu.C(COLUMN_ID).Eq(id)).
 		ToSQL()
@@ -645,9 +650,9 @@ func (store *store) SessionDeleteByID(ctx context.Context, id string) error {
 		return errSql
 	}
 
-	store.logSql("delete", sqlStr, params...)
+	st.logSql("delete", sqlStr, params...)
 
-	_, err := store.db.Exec(sqlStr, params...)
+	_, err := st.db.Exec(sqlStr, params...)
 
 	return err
 }
@@ -659,13 +664,13 @@ func (store *store) SessionDeleteByID(ctx context.Context, id string) error {
 //
 // Returns:
 //   - error - nil if successful, otherwise an error
-func (store *store) SessionDeleteByKey(sessionKey string) error {
+func (st *storeImplementation) SessionDeleteByKey(sessionKey string) error {
 	if sessionKey == "" {
 		return errors.New("session id is empty")
 	}
 
-	sqlStr, params, errSql := goqu.Dialect(store.dbDriverName).
-		Delete(store.sessionTableName).
+	sqlStr, params, errSql := goqu.Dialect(st.dbDriverName).
+		Delete(st.sessionTableName).
 		Prepared(true).
 		Where(goqu.C(COLUMN_SESSION_KEY).Eq(sessionKey)).
 		ToSQL()
@@ -674,9 +679,9 @@ func (store *store) SessionDeleteByKey(sessionKey string) error {
 		return errSql
 	}
 
-	store.logSql("delete", sqlStr, params...)
+	st.logSql("delete", sqlStr, params...)
 
-	_, err := store.db.Exec(sqlStr, params...)
+	_, err := st.db.Exec(sqlStr, params...)
 
 	return err
 }
@@ -690,7 +695,7 @@ func (store *store) SessionDeleteByKey(sessionKey string) error {
 //
 // Returns:
 //   - error - nil if successful, otherwise an error
-func (store *store) SessionExtend(ctx context.Context, session SessionInterface, seconds int64) error {
+func (st *storeImplementation) SessionExtend(ctx context.Context, session SessionInterface, seconds int64) error {
 	if session == nil {
 		return errors.New("session is nil")
 	}
@@ -699,7 +704,7 @@ func (store *store) SessionExtend(ctx context.Context, session SessionInterface,
 
 	session.SetExpiresAt(expiresAt)
 
-	return store.SessionUpdate(ctx, session)
+	return st.SessionUpdate(ctx, session)
 }
 
 // SessionFindByID finds a session by id.
@@ -711,7 +716,7 @@ func (store *store) SessionExtend(ctx context.Context, session SessionInterface,
 // Returns:
 //   - SessionInterface - the found session
 //   - error - nil if successful, otherwise an error
-func (store *store) SessionFindByID(ctx context.Context, sessionID string) (SessionInterface, error) {
+func (st *storeImplementation) SessionFindByID(ctx context.Context, sessionID string) (SessionInterface, error) {
 	if sessionID == "" {
 		return nil, errors.New("session store > find by id: session id is required")
 	}
@@ -721,7 +726,7 @@ func (store *store) SessionFindByID(ctx context.Context, sessionID string) (Sess
 		SetExpiresAtGte(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC)).
 		SetLimit(1)
 
-	list, err := store.SessionList(ctx, query)
+	list, err := st.SessionList(ctx, query)
 
 	if err != nil {
 		return nil, err
@@ -743,7 +748,7 @@ func (store *store) SessionFindByID(ctx context.Context, sessionID string) (Sess
 // Returns:
 //   - SessionInterface - the found session
 //   - error - nil if successful, otherwise an error
-func (store *store) SessionFindByKey(ctx context.Context, sessionKey string) (SessionInterface, error) {
+func (st *storeImplementation) SessionFindByKey(ctx context.Context, sessionKey string) (SessionInterface, error) {
 	if sessionKey == "" {
 		return nil, errors.New("session store > find by key: session key is required")
 	}
@@ -753,7 +758,7 @@ func (store *store) SessionFindByKey(ctx context.Context, sessionKey string) (Se
 		SetExpiresAtGte(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC)).
 		SetLimit(1)
 
-	list, err := store.SessionList(ctx, query)
+	list, err := st.SessionList(ctx, query)
 
 	if err != nil {
 		return nil, err
@@ -775,12 +780,12 @@ func (store *store) SessionFindByKey(ctx context.Context, sessionKey string) (Se
 // Returns:
 //   - []SessionInterface - list of matching sessions
 //   - error - nil if successful, otherwise an error
-func (store *store) SessionList(ctx context.Context, query SessionQueryInterface) ([]SessionInterface, error) {
+func (st *storeImplementation) SessionList(ctx context.Context, query SessionQueryInterface) ([]SessionInterface, error) {
 	if query == nil {
 		return []SessionInterface{}, errors.New("at session list > session query is nil")
 	}
 
-	q, columns, err := store.sessionSelectQuery(query)
+	q, columns, err := st.sessionSelectQuery(query)
 
 	if err != nil {
 		return []SessionInterface{}, err
@@ -792,13 +797,13 @@ func (store *store) SessionList(ctx context.Context, query SessionQueryInterface
 		return []SessionInterface{}, nil
 	}
 
-	store.logSql("list", sqlStr, sqlParams...)
+	st.logSql("list", sqlStr, sqlParams...)
 
-	if store.db == nil {
+	if st.db == nil {
 		return []SessionInterface{}, errors.New("userstore: database is nil")
 	}
 
-	modelMaps, err := database.SelectToMapString(database.Context(ctx, store.db), sqlStr, sqlParams...)
+	modelMaps, err := database.SelectToMapString(database.Context(ctx, st.db), sqlStr, sqlParams...)
 
 	if err != nil {
 		return []SessionInterface{}, err
@@ -807,7 +812,7 @@ func (store *store) SessionList(ctx context.Context, query SessionQueryInterface
 	list := make([]SessionInterface, 0, len(modelMaps))
 
 	for _, modelMap := range modelMaps {
-		decryptedValue, err := store.decryptValue(modelMap[COLUMN_SESSION_VALUE])
+		decryptedValue, err := st.decryptValue(modelMap[COLUMN_SESSION_VALUE])
 		if err != nil {
 			return []SessionInterface{}, err
 		}
@@ -829,7 +834,7 @@ func (store *store) SessionList(ctx context.Context, query SessionQueryInterface
 //
 // Returns:
 //   - error - nil if successful, otherwise an error
-func (store *store) SessionSoftDelete(ctx context.Context, session SessionInterface) error {
+func (st *storeImplementation) SessionSoftDelete(ctx context.Context, session SessionInterface) error {
 	if ctx == nil {
 		return errors.New("ctx is nil")
 	}
@@ -840,7 +845,7 @@ func (store *store) SessionSoftDelete(ctx context.Context, session SessionInterf
 
 	session.SetSoftDeletedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 
-	return store.SessionUpdate(ctx, session)
+	return st.SessionUpdate(ctx, session)
 }
 
 // SessionSoftDeleteByID soft deletes a session by id.
@@ -851,14 +856,14 @@ func (store *store) SessionSoftDelete(ctx context.Context, session SessionInterf
 //
 // Returns:
 //   - error - nil if successful, otherwise an error
-func (store *store) SessionSoftDeleteByID(ctx context.Context, id string) error {
-	session, err := store.SessionFindByID(ctx, id)
+func (st *storeImplementation) SessionSoftDeleteByID(ctx context.Context, id string) error {
+	session, err := st.SessionFindByID(ctx, id)
 
 	if err != nil {
 		return err
 	}
 
-	return store.SessionSoftDelete(ctx, session)
+	return st.SessionSoftDelete(ctx, session)
 }
 
 // SessionUpdate updates a session.
@@ -869,12 +874,12 @@ func (store *store) SessionSoftDeleteByID(ctx context.Context, id string) error 
 //
 // Returns:
 //   - error - nil if successful, otherwise an error
-func (store *store) SessionUpdate(ctx context.Context, session SessionInterface) error {
+func (st *storeImplementation) SessionUpdate(ctx context.Context, session SessionInterface) error {
 	if session == nil {
 		return errors.New("sessionstore > session update. session cannot be nil")
 	}
 
-	if store.db == nil {
+	if st.db == nil {
 		return errors.New("sessionstore > session update. db cannot be nil")
 	}
 
@@ -892,7 +897,7 @@ func (store *store) SessionUpdate(ctx context.Context, session SessionInterface)
 
 	for key, value := range dataChanged {
 		if key == COLUMN_SESSION_VALUE {
-			encryptedValue, err := store.encryptValue(value)
+			encryptedValue, err := st.encryptValue(value)
 			if err != nil {
 				return err
 			}
@@ -902,8 +907,8 @@ func (store *store) SessionUpdate(ctx context.Context, session SessionInterface)
 		updateData[key] = value
 	}
 
-	sqlStr, sqlParams, sqlErr := goqu.Dialect(store.dbDriverName).
-		Update(store.sessionTableName).
+	sqlStr, sqlParams, sqlErr := goqu.Dialect(st.dbDriverName).
+		Update(st.sessionTableName).
 		Prepared(true).
 		Where(goqu.C(COLUMN_SESSION_KEY).Eq(session.GetKey())).
 		Where(goqu.C(COLUMN_ID).Eq(session.GetID())).
@@ -914,9 +919,9 @@ func (store *store) SessionUpdate(ctx context.Context, session SessionInterface)
 		return sqlErr
 	}
 
-	store.logSql("update", sqlStr, sqlParams...)
+	st.logSql("update", sqlStr, sqlParams...)
 
-	_, err := database.Execute(database.Context(ctx, store.db), sqlStr, sqlParams...)
+	_, err := database.Execute(database.Context(ctx, st.db), sqlStr, sqlParams...)
 
 	if err != nil {
 		return err
@@ -936,7 +941,7 @@ func (store *store) SessionUpdate(ctx context.Context, session SessionInterface)
 //
 // Returns:
 //   - error - nil if successful, otherwise an error
-func (st *store) Set(ctx context.Context, sessionKey string, value string, seconds int64, options SessionOptionsInterface) error {
+func (st *storeImplementation) Set(ctx context.Context, sessionKey string, value string, seconds int64, options SessionOptionsInterface) error {
 	session, errFindByKey := st.FindByKey(ctx, sessionKey, options)
 
 	if errFindByKey != nil {
@@ -975,7 +980,7 @@ func (st *store) Set(ctx context.Context, sessionKey string, value string, secon
 //
 // Returns:
 //   - error - nil if successful, otherwise an error
-func (st *store) SetAny(ctx context.Context, key string, value interface{}, seconds int64, options SessionOptionsInterface) error {
+func (st *storeImplementation) SetAny(ctx context.Context, key string, value any, seconds int64, options SessionOptionsInterface) error {
 	jsonValue, jsonError := json.Marshal(value)
 	if jsonError != nil {
 		return jsonError
@@ -995,7 +1000,7 @@ func (st *store) SetAny(ctx context.Context, key string, value interface{}, seco
 //
 // Returns:
 //   - error - nil if successful, otherwise an error
-func (st *store) SetMap(ctx context.Context, key string, value map[string]any, seconds int64, options SessionOptionsInterface) error {
+func (st *storeImplementation) SetMap(ctx context.Context, key string, value map[string]any, seconds int64, options SessionOptionsInterface) error {
 	jsonValue, jsonError := json.Marshal(value)
 	if jsonError != nil {
 		return jsonError
@@ -1013,7 +1018,7 @@ func (st *store) SetMap(ctx context.Context, key string, value map[string]any, s
 //   - *goqu.SelectDataset - the select dataset
 //   - []any - the columns to select
 //   - error - nil if successful, otherwise an error
-func (store *store) sessionSelectQuery(options SessionQueryInterface) (selectDataset *goqu.SelectDataset, columns []any, err error) {
+func (st *storeImplementation) sessionSelectQuery(options SessionQueryInterface) (selectDataset *goqu.SelectDataset, columns []any, err error) {
 	if options == nil {
 		return nil, []any{}, errors.New("session query: cannot be nil")
 	}
@@ -1022,7 +1027,7 @@ func (store *store) sessionSelectQuery(options SessionQueryInterface) (selectDat
 		return nil, []any{}, err
 	}
 
-	q := goqu.Dialect(store.dbDriverName).From(store.sessionTableName)
+	q := goqu.Dialect(st.dbDriverName).From(st.sessionTableName)
 
 	if options.HasCreatedAtGte() && options.HasCreatedAtLte() {
 		q = q.Where(
@@ -1115,28 +1120,28 @@ func (store *store) sessionSelectQuery(options SessionQueryInterface) (selectDat
 //   - sqlOperationType - the type of SQL operation
 //   - sql - the SQL statement
 //   - params - the SQL parameters
-func (store *store) logSql(sqlOperationType string, sql string, params ...interface{}) {
-	if !store.debugEnabled {
+func (st *storeImplementation) logSql(sqlOperationType string, sql string, params ...interface{}) {
+	if !st.debugEnabled {
 		return
 	}
 
-	if store.sqlLogger != nil {
-		store.sqlLogger.Debug("sql: "+sqlOperationType, slog.String("sql", sql), slog.Any("params", params))
+	if st.sqlLogger != nil {
+		st.sqlLogger.Debug("sql: "+sqlOperationType, slog.String("sql", sql), slog.Any("params", params))
 	}
 }
 
-func (store *store) encryptValue(value string) (string, error) {
-	if store == nil || store.encryptor == nil {
+func (st *storeImplementation) encryptValue(value string) (string, error) {
+	if st == nil || st.encryptor == nil {
 		return value, nil
 	}
 
-	return store.encryptor.encrypt(value)
+	return st.encryptor.encrypt(value)
 }
 
-func (store *store) decryptValue(value string) (string, error) {
-	if store == nil || store.encryptor == nil {
+func (st *storeImplementation) decryptValue(value string) (string, error) {
+	if st == nil || st.encryptor == nil {
 		return value, nil
 	}
 
-	return store.encryptor.decrypt(value)
+	return st.encryptor.decrypt(value)
 }

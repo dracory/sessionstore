@@ -23,8 +23,8 @@ type NewStoreOptions struct {
 }
 
 // NewStore creates a new session store
-func NewStore(opts NewStoreOptions) (*store, error) {
-	store := &store{
+func NewStore(opts NewStoreOptions) (StoreInterface, error) {
+	store := &storeImplementation{
 		sessionTableName:   opts.SessionTableName,
 		automigrateEnabled: opts.AutomigrateEnabled,
 		db:                 opts.DB,

@@ -45,7 +45,7 @@ func initStore(filepath string) (StoreInterface, error) {
 	return store, nil
 }
 
-func initStoreWithOptions(filepath string, opts NewStoreOptions) (*store, error) {
+func initStoreWithOptions(filepath string, opts NewStoreOptions) (StoreInterface, error) {
 	db, err := initDB(filepath)
 
 	if err != nil {
@@ -705,27 +705,31 @@ func TestStore_SetGetWithoutEncryption(t *testing.T) {
 		t.Fatal("Store could not be created: ", err.Error())
 	}
 
-	defer store.db.Close()
+	defer store.GetDB().Close()
 
 	sessionKey := "plain-key"
 	value := "plain-value"
 
-	if err := store.Set(context.Background(), sessionKey, value, 60, SessionOptions()); err != nil {
+	session := NewSession().
+		SetKey(sessionKey).
+		SetValue(value)
+
+	if err := store.SessionCreate(context.Background(), session); err != nil {
 		t.Fatalf("Set failed: %v", err)
 	}
 
-	got, err := store.Get(context.Background(), sessionKey, "", SessionOptions())
+	got, err := store.SessionFindByKey(context.Background(), sessionKey)
 
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
 
-	if got != value {
+	if got.GetValue() != value {
 		t.Fatalf("expected value %q, got %q", value, got)
 	}
 
 	var raw string
-	rowErr := store.db.QueryRow("SELECT session_value FROM session WHERE session_key = ?", sessionKey).Scan(&raw)
+	rowErr := store.GetDB().QueryRow("SELECT session_value FROM session WHERE session_key = ?", sessionKey).Scan(&raw)
 
 	if rowErr != nil {
 		t.Fatalf("failed to query raw value: %v", rowErr)
@@ -750,26 +754,30 @@ func TestStore_SetGetWithEncryption(t *testing.T) {
 		t.Fatal("Store could not be created: ", err.Error())
 	}
 
-	defer store.db.Close()
+	defer store.GetDB().Close()
 
 	sessionKey := "encrypted-key"
 	value := "emoji 😀 and json {\"foo\":\"bar\"}"
 
-	if err := store.Set(context.Background(), sessionKey, value, 60, SessionOptions()); err != nil {
+	session := NewSession().
+		SetKey(sessionKey).
+		SetValue(value)
+
+	if err := store.SessionCreate(context.Background(), session); err != nil {
 		t.Fatalf("Set failed: %v", err)
 	}
 
-	got, err := store.Get(context.Background(), sessionKey, "", SessionOptions())
+	got, err := store.SessionFindByKey(context.Background(), sessionKey)
 
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
 
-	if got != value {
+	if got.GetValue() != value {
 		t.Fatalf("expected value %q, got %q", value, got)
 	}
 
-	sessionFound, err := store.FindByKey(context.Background(), sessionKey, SessionOptions())
+	sessionFound, err := store.SessionFindByKey(context.Background(), sessionKey)
 	if err != nil {
 		t.Fatalf("FindByKey failed: %v", err)
 	}
@@ -783,7 +791,7 @@ func TestStore_SetGetWithEncryption(t *testing.T) {
 	}
 
 	var raw string
-	rowErr := store.db.QueryRow("SELECT session_value FROM session WHERE session_key = ?", sessionKey).Scan(&raw)
+	rowErr := store.GetDB().QueryRow("SELECT session_value FROM session WHERE session_key = ?", sessionKey).Scan(&raw)
 
 	if rowErr != nil {
 		t.Fatalf("failed to query raw value: %v", rowErr)
@@ -807,7 +815,7 @@ func TestNewStore_EncryptionEnabledWithoutKey(t *testing.T) {
 
 	if err == nil {
 		if store != nil {
-			store.db.Close()
+			store.GetDB().Close()
 		}
 		t.Fatal("expected error when encryption enabled without key")
 	}
