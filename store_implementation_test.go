@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"os"
 	"strings"
 	"testing"
 
@@ -13,16 +12,8 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func initDB(filepath string) (*sql.DB, error) {
-	if filepath != ":memory:" && fileExists(filepath) {
-		err := os.Remove(filepath) // remove database
-
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	dsn := filepath + "?parseTime=true"
+func initDB() (*sql.DB, error) {
+	dsn := ":memory:?parseTime=true"
 	db, err := sql.Open("sqlite", dsn)
 
 	if err != nil {
@@ -32,8 +23,8 @@ func initDB(filepath string) (*sql.DB, error) {
 	return db, nil
 }
 
-func initStore(filepath string) (StoreInterface, error) {
-	store, err := initStoreWithOptions(filepath, NewStoreOptions{
+func initStore() (StoreInterface, error) {
+	store, err := initStoreWithOptions(NewStoreOptions{
 		SessionTableName:   "session",
 		AutomigrateEnabled: true,
 	})
@@ -45,8 +36,8 @@ func initStore(filepath string) (StoreInterface, error) {
 	return store, nil
 }
 
-func initStoreWithOptions(filepath string, opts NewStoreOptions) (StoreInterface, error) {
-	db, err := initDB(filepath)
+func initStoreWithOptions(opts NewStoreOptions) (StoreInterface, error) {
+	db, err := initDB()
 
 	if err != nil {
 		return nil, err
@@ -74,7 +65,7 @@ func initStoreWithOptions(filepath string, opts NewStoreOptions) (StoreInterface
 }
 
 func TestStore_Create(t *testing.T) {
-	store, err := initStore(":memory:")
+	store, err := initStore()
 
 	if err != nil {
 		t.Fatal("Store could not be created: ", err.Error())
@@ -86,7 +77,7 @@ func TestStore_Create(t *testing.T) {
 }
 
 func TestStore_Automigrate(t *testing.T) {
-	store, err := initStore(":memory:")
+	store, err := initStore()
 
 	if err != nil {
 		t.Fatal("Store could not be created: ", err.Error())
@@ -100,7 +91,7 @@ func TestStore_Automigrate(t *testing.T) {
 }
 
 func TestStore_EnableDebug(t *testing.T) {
-	store, err := initStore(":memory:")
+	store, err := initStore()
 
 	if err != nil {
 		t.Fatal("Store could not be created: ", err.Error())
@@ -116,7 +107,7 @@ func TestStore_EnableDebug(t *testing.T) {
 }
 
 // func TestSetGetMap(t *testing.T) {
-// 	store, err := initStore(":memory:")
+// 	store, err := initStore()
 
 // 	if err != nil {
 // 		t.Fatal("Store could not be created: ", err.Error())
@@ -157,7 +148,7 @@ func TestStore_EnableDebug(t *testing.T) {
 // }
 
 // func TestMergeMap(t *testing.T) {
-// 	store, err := initStore(":memory:")
+// 	store, err := initStore()
 
 // 	if err != nil {
 // 		t.Fatal("Store could not be created: ", err.Error())
@@ -209,7 +200,7 @@ func TestStore_EnableDebug(t *testing.T) {
 // }
 
 // func TestExtend(t *testing.T) {
-// 	store, err := initStore(":memory:")
+// 	store, err := initStore()
 
 // 	if err != nil {
 // 		t.Fatal("Store could not be created: ", err.Error())
@@ -254,7 +245,7 @@ func TestStore_EnableDebug(t *testing.T) {
 // }
 
 func TestStore_SessionCreate(t *testing.T) {
-	store, err := initStore(":memory:")
+	store, err := initStore()
 
 	if err != nil {
 		t.Fatal("Store could not be created: ", err.Error())
@@ -290,7 +281,7 @@ func TestStore_SessionCreate(t *testing.T) {
 }
 
 func TestStore_SessionDelete(t *testing.T) {
-	store, err := initStore(":memory:")
+	store, err := initStore()
 
 	if err != nil {
 		t.Fatal("Store could not be created: ", err.Error())
@@ -325,7 +316,7 @@ func TestStore_SessionDelete(t *testing.T) {
 }
 
 func TestStore_SessionDeleteByID(t *testing.T) {
-	store, err := initStore(":memory:")
+	store, err := initStore()
 
 	if err != nil {
 		t.Fatal("Store could not be created: ", err.Error())
@@ -369,7 +360,7 @@ func TestStore_SessionDeleteByID(t *testing.T) {
 }
 
 func TestStore_SessionExtend(t *testing.T) {
-	store, err := initStore(":memory:")
+	store, err := initStore()
 
 	if err != nil {
 		t.Fatal("Store could not be created: ", err.Error())
@@ -462,7 +453,7 @@ func TestStore_SessionExtend(t *testing.T) {
 }
 
 func TestStore_SessionFindByID(t *testing.T) {
-	store, err := initStore(":memory:")
+	store, err := initStore()
 
 	if err != nil {
 		t.Fatal("Store could not be created: ", err.Error())
@@ -508,7 +499,7 @@ func TestStore_SessionFindByID(t *testing.T) {
 }
 
 func TestStore_SessionFindByKey(t *testing.T) {
-	store, err := initStore(":memory:")
+	store, err := initStore()
 
 	if err != nil {
 		t.Fatal("Store could not be created: ", err.Error())
@@ -558,7 +549,7 @@ func TestStore_SessionFindByKey(t *testing.T) {
 }
 
 func TestStore_SessionList(t *testing.T) {
-	store, err := initStore(":memory:")
+	store, err := initStore()
 
 	if err != nil {
 		t.Fatal("Store could not be created: ", err.Error())
@@ -597,7 +588,7 @@ func TestStore_SessionList(t *testing.T) {
 }
 
 func TestStore_SessionSoftDelete(t *testing.T) {
-	store, err := initStore(":memory:")
+	store, err := initStore()
 
 	if err != nil {
 		t.Fatal("Store could not be created: ", err.Error())
@@ -654,7 +645,7 @@ func TestStore_SessionSoftDelete(t *testing.T) {
 }
 
 func TestStore_SessionUpdate(t *testing.T) {
-	store, err := initStore(":memory:")
+	store, err := initStore()
 
 	if err != nil {
 		t.Fatal("Store could not be created: ", err.Error())
@@ -696,7 +687,7 @@ func TestStore_SessionUpdate(t *testing.T) {
 }
 
 func TestStore_SetGetWithoutEncryption(t *testing.T) {
-	store, err := initStoreWithOptions(":memory:", NewStoreOptions{
+	store, err := initStoreWithOptions(NewStoreOptions{
 		SessionTableName:   "session",
 		AutomigrateEnabled: true,
 	})
@@ -743,7 +734,7 @@ func TestStore_SetGetWithoutEncryption(t *testing.T) {
 func TestStore_SetGetWithEncryption(t *testing.T) {
 	encryptionKey := []byte("0123456789abcdef0123456789abcdef")
 
-	store, err := initStoreWithOptions(":memory:", NewStoreOptions{
+	store, err := initStoreWithOptions(NewStoreOptions{
 		SessionTableName:   "session",
 		AutomigrateEnabled: true,
 		EncryptionEnabled:  true,
@@ -807,7 +798,7 @@ func TestStore_SetGetWithEncryption(t *testing.T) {
 }
 
 func TestNewStore_EncryptionEnabledWithoutKey(t *testing.T) {
-	store, err := initStoreWithOptions(":memory:", NewStoreOptions{
+	store, err := initStoreWithOptions(NewStoreOptions{
 		SessionTableName:   "session",
 		AutomigrateEnabled: true,
 		EncryptionEnabled:  true,
