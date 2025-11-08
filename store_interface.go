@@ -29,8 +29,8 @@ type StoreInterface interface {
 	SessionDelete(ctx context.Context, session SessionInterface) error
 	SessionDeleteByID(ctx context.Context, sessionID string) error
 	SessionExtend(ctx context.Context, session SessionInterface, seconds int64) error
-	SessionFindByID(ctx context.Context, sessionID string) (SessionInterface, error)
-	SessionFindByKey(ctx context.Context, sessionKey string) (SessionInterface, error)
+	SessionFindByID(ctx context.Context, sessionID string, options ...SessionOptionsInterface) (SessionInterface, error)
+	SessionFindByKey(ctx context.Context, sessionKey string, options ...SessionOptionsInterface) (SessionInterface, error)
 	SessionList(ctx context.Context, query SessionQueryInterface) ([]SessionInterface, error)
 	SessionSoftDelete(ctx context.Context, session SessionInterface) error
 	SessionSoftDeleteByID(ctx context.Context, sessionID string) error

@@ -16,6 +16,7 @@ import (
 	"github.com/dracory/sb"
 	"github.com/dromara/carbon/v2"
 	"github.com/georgysavva/scany/sqlscan"
+	"github.com/samber/lo"
 	"github.com/spf13/cast"
 )
 
@@ -181,7 +182,7 @@ func (st *storeImplementation) expireSessionsOnce(ctx context.Context) error {
 // Returns:
 //   - error - nil if successful, otherwise an error
 func (store *storeImplementation) Extend(ctx context.Context, sessionKey string, seconds int64, options SessionOptionsInterface) error {
-	session, errFindByKey := store.FindByKey(ctx, sessionKey, options)
+	session, errFindByKey := store.SessionFindByKey(ctx, sessionKey, options)
 
 	if errFindByKey != nil {
 		return errFindByKey
@@ -273,40 +274,40 @@ func (st *storeImplementation) Delete(ctx context.Context, sessionKey string, op
 // Returns:
 //   - SessionInterface - the found session
 //   - error - nil if successful, otherwise an error
-func (st *storeImplementation) FindByKey(ctx context.Context, sessionKey string, options SessionOptionsInterface) (SessionInterface, error) {
-	if sessionKey == "" {
-		return nil, errors.New("session store > find by key: session key is required")
-	}
+// func (st *storeImplementation) FindByKey(ctx context.Context, sessionKey string, options SessionOptionsInterface) (SessionInterface, error) {
+// 	if sessionKey == "" {
+// 		return nil, errors.New("session store > find by key: session key is required")
+// 	}
 
-	query := SessionQuery().
-		SetKey(sessionKey).
-		SetExpiresAtGte(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC)).
-		SetLimit(1)
+// 	query := SessionQuery().
+// 		SetKey(sessionKey).
+// 		SetExpiresAtGte(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC)).
+// 		SetLimit(1)
 
-	if options.HasIPAddress() {
-		query.SetUserIpAddress(options.GetIPAddress())
-	}
+// 	if options.HasIPAddress() {
+// 		query.SetUserIpAddress(options.GetIPAddress())
+// 	}
 
-	if options.HasUserAgent() {
-		query.SetUserAgent(options.GetUserAgent())
-	}
+// 	if options.HasUserAgent() {
+// 		query.SetUserAgent(options.GetUserAgent())
+// 	}
 
-	if options.HasUserID() {
-		query.SetUserID(options.GetUserID())
-	}
+// 	if options.HasUserID() {
+// 		query.SetUserID(options.GetUserID())
+// 	}
 
-	list, err := st.SessionList(ctx, query)
+// 	list, err := st.SessionList(ctx, query)
 
-	if err != nil {
-		return nil, err
-	}
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	if len(list) > 0 {
-		return list[0], nil
-	}
+// 	if len(list) > 0 {
+// 		return list[0], nil
+// 	}
 
-	return nil, nil
-}
+// 	return nil, nil
+// }
 
 // Get is a shortcut for getting the value of a session, or a default value if not found
 //
@@ -322,7 +323,7 @@ func (st *storeImplementation) FindByKey(ctx context.Context, sessionKey string,
 //   - string - the session value
 //   - error - nil if successful, otherwise an error
 func (st *storeImplementation) Get(ctx context.Context, sessionKey string, valueDefault string, options SessionOptionsInterface) (string, error) {
-	session, errFindByKey := st.FindByKey(ctx, sessionKey, options)
+	session, errFindByKey := st.SessionFindByKey(ctx, sessionKey, options)
 
 	if errFindByKey != nil {
 		return "", errFindByKey
@@ -351,7 +352,7 @@ func (st *storeImplementation) Get(ctx context.Context, sessionKey string, value
 //   - interface{} - the parsed value
 //   - error - nil if successful, otherwise an error
 func (st *storeImplementation) GetAny(ctx context.Context, key string, valueDefault interface{}, options SessionOptionsInterface) (interface{}, error) {
-	session, errFindByKey := st.FindByKey(ctx, key, options)
+	session, errFindByKey := st.SessionFindByKey(ctx, key, options)
 
 	if errFindByKey != nil {
 		return valueDefault, errFindByKey
@@ -386,7 +387,7 @@ func (st *storeImplementation) GetAny(ctx context.Context, key string, valueDefa
 //   - map[string]any - the parsed map
 //   - error - nil if successful, otherwise an error
 func (st *storeImplementation) GetMap(ctx context.Context, key string, valueDefault map[string]any, options SessionOptionsInterface) (map[string]any, error) {
-	session, errFindByKey := st.FindByKey(ctx, key, options)
+	session, errFindByKey := st.SessionFindByKey(ctx, key, options)
 
 	if errFindByKey != nil {
 		return valueDefault, errFindByKey
@@ -716,15 +717,29 @@ func (st *storeImplementation) SessionExtend(ctx context.Context, session Sessio
 // Returns:
 //   - SessionInterface - the found session
 //   - error - nil if successful, otherwise an error
-func (st *storeImplementation) SessionFindByID(ctx context.Context, sessionID string) (SessionInterface, error) {
+func (st *storeImplementation) SessionFindByID(ctx context.Context, sessionID string, options ...SessionOptionsInterface) (SessionInterface, error) {
 	if sessionID == "" {
 		return nil, errors.New("session store > find by id: session id is required")
 	}
+
+	o := lo.FirstOr(options, NewSessionOptions())
 
 	query := SessionQuery().
 		SetID(sessionID).
 		SetExpiresAtGte(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC)).
 		SetLimit(1)
+
+	if o.HasIPAddress() {
+		query.SetUserIpAddress(o.GetIPAddress())
+	}
+
+	if o.HasUserAgent() {
+		query.SetUserAgent(o.GetUserAgent())
+	}
+
+	if o.HasUserID() {
+		query.SetUserID(o.GetUserID())
+	}
 
 	list, err := st.SessionList(ctx, query)
 
@@ -748,15 +763,29 @@ func (st *storeImplementation) SessionFindByID(ctx context.Context, sessionID st
 // Returns:
 //   - SessionInterface - the found session
 //   - error - nil if successful, otherwise an error
-func (st *storeImplementation) SessionFindByKey(ctx context.Context, sessionKey string) (SessionInterface, error) {
+func (st *storeImplementation) SessionFindByKey(ctx context.Context, sessionKey string, options ...SessionOptionsInterface) (SessionInterface, error) {
 	if sessionKey == "" {
 		return nil, errors.New("session store > find by key: session key is required")
 	}
+
+	o := lo.FirstOr(options, NewSessionOptions())
 
 	query := SessionQuery().
 		SetKey(sessionKey).
 		SetExpiresAtGte(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC)).
 		SetLimit(1)
+
+	if o.HasIPAddress() {
+		query.SetUserIpAddress(o.GetIPAddress())
+	}
+
+	if o.HasUserAgent() {
+		query.SetUserAgent(o.GetUserAgent())
+	}
+
+	if o.HasUserID() {
+		query.SetUserID(o.GetUserID())
+	}
 
 	list, err := st.SessionList(ctx, query)
 
@@ -942,7 +971,7 @@ func (st *storeImplementation) SessionUpdate(ctx context.Context, session Sessio
 // Returns:
 //   - error - nil if successful, otherwise an error
 func (st *storeImplementation) Set(ctx context.Context, sessionKey string, value string, seconds int64, options SessionOptionsInterface) error {
-	session, errFindByKey := st.FindByKey(ctx, sessionKey, options)
+	session, errFindByKey := st.SessionFindByKey(ctx, sessionKey, options)
 
 	if errFindByKey != nil {
 		return errFindByKey
