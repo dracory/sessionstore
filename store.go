@@ -79,7 +79,8 @@ func (st *store) EnableDebug(debug bool) {
 	st.debugEnabled = debug
 }
 
-// SessionExpiryGoroutine this is a goroutine that deletes expired sessions.
+// SessionExpiryGoroutine this is a goroutine that deletes expired sessions
+// honoring the provided context.
 // It runs periodically (every minute) and deletes any sessions that have expired.
 //
 // This is a goroutine that runs periodically (every minute) and deletes
@@ -90,46 +91,78 @@ func (st *store) EnableDebug(debug bool) {
 //
 // Returns:
 //   - error - nil if successful, otherwise an error
-func (st *store) SessionExpiryGoroutine() error {
-	i := 0
+func (st *store) SessionExpiryGoroutine(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	if err := st.expireSessionsOnce(ctx); err != nil {
+		if errors.Is(err, context.Canceled) {
+			return nil
+		}
+		return err
+	}
+
+	ticker := time.NewTicker(60 * time.Second)
+	defer ticker.Stop()
+
 	for {
-		i++
-
-		if st.debugEnabled {
-			log.Println("Cleaning expired sessions...")
-		}
-
-		sqlStr, sqlParams, err := goqu.Dialect(st.dbDriverName).
-			From(st.sessionTableName).
-			Where(goqu.C(COLUMN_EXPIRES_AT).Lt(time.Now())).
-			Delete().
-			Prepared(true).
-			ToSQL()
-
-		if err != nil {
-			return err
-		}
-
-		st.logSql("delete", sqlStr, sqlParams)
-
-		_, err = database.Execute(database.Context(context.Background(), st.db), sqlStr, sqlParams...)
-
-		if err != nil {
-			if err == sql.ErrNoRows {
-				// Looks like this is now outdated for sqlscan
-				return nil
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			if err := st.expireSessionsOnce(ctx); err != nil {
+				if errors.Is(err, context.Canceled) {
+					return nil
+				}
+				return err
 			}
+		}
+	}
+}
 
-			if sqlscan.NotFound(err) {
-				return nil
-			}
+func (st *store) expireSessionsOnce(ctx context.Context) error {
+	if st.debugEnabled {
+		log.Println("Cleaning expired sessions...")
+	}
 
-			log.Println("Session Store. ExpireSessionGoroutine. Error: ", err)
+	sqlStr, sqlParams, err := goqu.Dialect(st.dbDriverName).
+		From(st.sessionTableName).
+		Where(goqu.C(COLUMN_EXPIRES_AT).Lt(time.Now())).
+		Delete().
+		Prepared(true).
+		ToSQL()
+
+	if err != nil {
+		return err
+	}
+
+	st.logSql("delete", sqlStr, sqlParams)
+
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	_, err = database.Execute(database.Context(ctx, st.db), sqlStr, sqlParams...)
+
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return context.Canceled
+		}
+		if err == sql.ErrNoRows {
+			// Looks like this is now outdated for sqlscan
 			return nil
 		}
 
-		time.Sleep(60 * time.Second) // Every minute
+		if sqlscan.NotFound(err) {
+			return nil
+		}
+
+		log.Println("Session Store. ExpireSessionGoroutine. Error: ", err)
+		return nil
 	}
+
+	return nil
 }
 
 // Extend extends the session expiry time with the given seconds.

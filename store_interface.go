@@ -5,7 +5,7 @@ import "context"
 type StoreInterface interface {
 	AutoMigrate(ctx context.Context) error
 	EnableDebug(debug bool)
-	SessionExpiryGoroutine() error
+	SessionExpiryGoroutine(ctx context.Context) error
 
 	// New API
 	SessionCount(ctx context.Context, query SessionQueryInterface) (int64, error)
