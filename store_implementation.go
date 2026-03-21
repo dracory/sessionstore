@@ -48,17 +48,16 @@ type storeImplementation struct {
 // Returns:
 //   - error - nil if successful, otherwise an error
 func (st *storeImplementation) AutoMigrate(ctx context.Context) error {
-	sqlStr := st.SQLCreateTable()
-
-	if sqlStr == "" {
-		return errors.New("session store: table create sql is empty")
+	sqlStr, err := st.SQLCreateTable()
+	if err != nil {
+		return err
 	}
 
 	if st.db == nil {
 		return errors.New("session store: database is nil")
 	}
 
-	_, err := database.Execute(database.Context(ctx, st.db), sqlStr)
+	_, err = database.Execute(database.Context(ctx, st.db), sqlStr)
 
 	if err != nil {
 		return err

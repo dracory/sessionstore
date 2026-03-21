@@ -508,10 +508,6 @@ func TestStore_SessionFindByKey(t *testing.T) {
 	session := NewSession().
 		SetValue("one two three four")
 
-	if err != nil {
-		t.Fatal("unexpected error:", err)
-	}
-
 	if session == nil {
 		t.Fatal("unexpected nil session")
 	}
@@ -660,10 +656,6 @@ func TestStore_SessionUpdate(t *testing.T) {
 	}
 
 	session.SetValue("one two three")
-
-	if err != nil {
-		t.Fatal("unexpected error:", err)
-	}
 
 	err = store.SessionUpdate(context.Background(), session)
 

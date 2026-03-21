@@ -5,8 +5,8 @@ import (
 )
 
 // SQLCreateTable returns a SQL string for creating the cache table
-func (st *storeImplementation) SQLCreateTable() string {
-	sql := sb.NewBuilder(st.dbDriverName).
+func (st *storeImplementation) SQLCreateTable() (string, error) {
+	sql, err := sb.NewBuilder(st.dbDriverName).
 		Table(st.sessionTableName).
 		Column(sb.Column{
 			Name:       COLUMN_ID,
@@ -56,5 +56,5 @@ func (st *storeImplementation) SQLCreateTable() string {
 		}).
 		CreateIfNotExists()
 
-	return sql
+	return sql, err
 }
