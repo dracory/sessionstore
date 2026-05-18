@@ -4,8 +4,8 @@ import (
 	"github.com/dracory/sb"
 )
 
-// SQLCreateTable returns a SQL string for creating the cache table
-func (st *storeImplementation) SQLCreateTable() (string, error) {
+// sqlCreateTable returns a SQL string for creating the session table
+func (st *storeImplementation) sqlCreateTable() (string, error) {
 	sql, err := sb.NewBuilder(st.dbDriverName).
 		Table(st.sessionTableName).
 		Column(sb.Column{
@@ -55,6 +55,15 @@ func (st *storeImplementation) SQLCreateTable() (string, error) {
 			Type: sb.COLUMN_TYPE_DATETIME,
 		}).
 		CreateIfNotExists()
+
+	return sql, err
+}
+
+// sqlDropTable returns a SQL string for dropping the session table
+func (st *storeImplementation) sqlDropTable() (string, error) {
+	sql, err := sb.NewBuilder(st.dbDriverName).
+		Table(st.sessionTableName).
+		Drop()
 
 	return sql, err
 }

@@ -40,24 +40,44 @@ type storeImplementation struct {
 
 // PUBLIC METHODS ============================================================
 
-// AutoMigrate creates the session table if it does not exist
-//
-// Parameters:
-//   - ctx - the context
-//
-// Returns:
-//   - error - nil if successful, otherwise an error
-func (st *storeImplementation) AutoMigrate(ctx context.Context) error {
-	sqlStr, err := st.SQLCreateTable()
+// MigrateUp creates the session table
+func (st *storeImplementation) MigrateUp(tx *sql.Tx) error {
+	sqlStr, err := st.sqlCreateTable()
 	if err != nil {
 		return err
 	}
 
-	if st.db == nil {
-		return errors.New("session store: database is nil")
+	if tx != nil {
+		_, err = tx.Exec(sqlStr)
+	} else {
+		if st.db == nil {
+			return errors.New("session store: database is nil")
+		}
+		_, err = database.Execute(database.Context(context.Background(), st.db), sqlStr)
 	}
 
-	_, err = database.Execute(database.Context(ctx, st.db), sqlStr)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// MigrateDown drops the session table
+func (st *storeImplementation) MigrateDown(tx *sql.Tx) error {
+	sqlStr, err := st.sqlDropTable()
+	if err != nil {
+		return err
+	}
+
+	if tx != nil {
+		_, err = tx.Exec(sqlStr)
+	} else {
+		if st.db == nil {
+			return errors.New("session store: database is nil")
+		}
+		_, err = database.Execute(database.Context(context.Background(), st.db), sqlStr)
+	}
 
 	if err != nil {
 		return err
@@ -77,6 +97,26 @@ func (st *storeImplementation) AutoMigrate(ctx context.Context) error {
 //   - void
 func (st *storeImplementation) EnableDebug(debug bool) {
 	st.debugEnabled = debug
+}
+
+// GetSessionTableName returns the session table name
+func (st *storeImplementation) GetSessionTableName() string {
+	return st.sessionTableName
+}
+
+// SetSessionTableName sets the session table name
+func (st *storeImplementation) SetSessionTableName(sessionTableName string) {
+	st.sessionTableName = sessionTableName
+}
+
+// GetTimeoutSeconds returns the session timeout in seconds
+func (st *storeImplementation) GetTimeoutSeconds() int64 {
+	return st.timeoutSeconds
+}
+
+// SetTimeoutSeconds sets the session timeout in seconds
+func (st *storeImplementation) SetTimeoutSeconds(timeoutSeconds int64) {
+	st.timeoutSeconds = timeoutSeconds
 }
 
 // GetDB returns the database connection

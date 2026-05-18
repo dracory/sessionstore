@@ -6,7 +6,20 @@ import (
 )
 
 type StoreInterface interface {
-	AutoMigrate(ctx context.Context) error
+	// GetSessionTableName returns the session table name
+	GetSessionTableName() string
+	// SetSessionTableName sets the session table name
+	SetSessionTableName(sessionTableName string)
+	// GetTimeoutSeconds returns the session timeout in seconds
+	GetTimeoutSeconds() int64
+	// SetTimeoutSeconds sets the session timeout in seconds
+	SetTimeoutSeconds(timeoutSeconds int64)
+
+	// MigrateDown drops the session table
+	MigrateDown(tx *sql.Tx) error
+	// MigrateUp creates the session table
+	MigrateUp(tx *sql.Tx) error
+
 	EnableDebug(debug bool)
 	SessionExpiryGoroutine(ctx context.Context) error
 	GetDB() *sql.DB
