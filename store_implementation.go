@@ -41,14 +41,19 @@ type storeImplementation struct {
 // PUBLIC METHODS ============================================================
 
 // MigrateUp creates the session table
-func (st *storeImplementation) MigrateUp(tx *sql.Tx) error {
+func (st *storeImplementation) MigrateUp(tx ...*sql.Tx) error {
+	var txToUse *sql.Tx
+	if len(tx) > 0 {
+		txToUse = tx[0]
+	}
+
 	sqlStr, err := st.sqlCreateTable()
 	if err != nil {
 		return err
 	}
 
-	if tx != nil {
-		_, err = tx.Exec(sqlStr)
+	if txToUse != nil {
+		_, err = txToUse.Exec(sqlStr)
 	} else {
 		if st.db == nil {
 			return errors.New("session store: database is nil")
@@ -64,14 +69,19 @@ func (st *storeImplementation) MigrateUp(tx *sql.Tx) error {
 }
 
 // MigrateDown drops the session table
-func (st *storeImplementation) MigrateDown(tx *sql.Tx) error {
+func (st *storeImplementation) MigrateDown(tx ...*sql.Tx) error {
+	var txToUse *sql.Tx
+	if len(tx) > 0 {
+		txToUse = tx[0]
+	}
+
 	sqlStr, err := st.sqlDropTable()
 	if err != nil {
 		return err
 	}
 
-	if tx != nil {
-		_, err = tx.Exec(sqlStr)
+	if txToUse != nil {
+		_, err = txToUse.Exec(sqlStr)
 	} else {
 		if st.db == nil {
 			return errors.New("session store: database is nil")

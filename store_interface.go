@@ -16,9 +16,9 @@ type StoreInterface interface {
 	SetTimeoutSeconds(timeoutSeconds int64)
 
 	// MigrateDown drops the session table
-	MigrateDown(tx *sql.Tx) error
+	MigrateDown(tx ...*sql.Tx) error
 	// MigrateUp creates the session table
-	MigrateUp(tx *sql.Tx) error
+	MigrateUp(tx ...*sql.Tx) error
 
 	EnableDebug(debug bool)
 	SessionExpiryGoroutine(ctx context.Context) error

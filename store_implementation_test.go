@@ -83,7 +83,7 @@ func TestStore_Automigrate(t *testing.T) {
 		t.Fatal("Store could not be created: ", err.Error())
 	}
 
-	err = store.MigrateUp(nil)
+	err = store.MigrateUp()
 
 	if err != nil {
 		t.Fatal("MigrateUp failed: " + err.Error())
@@ -99,7 +99,7 @@ func TestStore_EnableDebug(t *testing.T) {
 
 	store.EnableDebug(true)
 
-	err = store.MigrateUp(nil)
+	err = store.MigrateUp()
 
 	if err != nil {
 		t.Fatal("MigrateUp failed: " + err.Error())

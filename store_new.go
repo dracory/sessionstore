@@ -68,7 +68,7 @@ func NewStore(opts NewStoreOptions) (StoreInterface, error) {
 	}
 
 	if store.automigrateEnabled {
-		store.MigrateUp(nil)
+		store.MigrateUp()
 	}
 
 	return store, nil
