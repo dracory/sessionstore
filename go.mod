@@ -33,5 +33,5 @@ require (
 	github.com/dromara/carbon/v2 v2.6.16
 	github.com/samber/lo v1.53.0
 	github.com/spf13/cast v1.10.0
-	modernc.org/sqlite v1.50.0
+	modernc.org/sqlite v1.50.1
 )
