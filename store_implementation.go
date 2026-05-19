@@ -41,7 +41,7 @@ type storeImplementation struct {
 // PUBLIC METHODS ============================================================
 
 // MigrateUp creates the session table
-func (st *storeImplementation) MigrateUp(tx ...*sql.Tx) error {
+func (st *storeImplementation) MigrateUp(ctx context.Context, tx ...*sql.Tx) error {
 	var txToUse *sql.Tx
 	if len(tx) > 0 {
 		txToUse = tx[0]
@@ -53,12 +53,12 @@ func (st *storeImplementation) MigrateUp(tx ...*sql.Tx) error {
 	}
 
 	if txToUse != nil {
-		_, err = txToUse.Exec(sqlStr)
+		_, err = txToUse.ExecContext(ctx, sqlStr)
 	} else {
 		if st.db == nil {
 			return errors.New("session store: database is nil")
 		}
-		_, err = database.Execute(database.Context(context.Background(), st.db), sqlStr)
+		_, err = database.Execute(database.Context(ctx, st.db), sqlStr)
 	}
 
 	if err != nil {
@@ -69,7 +69,7 @@ func (st *storeImplementation) MigrateUp(tx ...*sql.Tx) error {
 }
 
 // MigrateDown drops the session table
-func (st *storeImplementation) MigrateDown(tx ...*sql.Tx) error {
+func (st *storeImplementation) MigrateDown(ctx context.Context, tx ...*sql.Tx) error {
 	var txToUse *sql.Tx
 	if len(tx) > 0 {
 		txToUse = tx[0]
@@ -81,12 +81,12 @@ func (st *storeImplementation) MigrateDown(tx ...*sql.Tx) error {
 	}
 
 	if txToUse != nil {
-		_, err = txToUse.Exec(sqlStr)
+		_, err = txToUse.ExecContext(ctx, sqlStr)
 	} else {
 		if st.db == nil {
 			return errors.New("session store: database is nil")
 		}
-		_, err = database.Execute(database.Context(context.Background(), st.db), sqlStr)
+		_, err = database.Execute(database.Context(ctx, st.db), sqlStr)
 	}
 
 	if err != nil {
