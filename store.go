@@ -7,7 +7,6 @@ import (
 	"errors"
 	"log/slog"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/dracory/neat"
@@ -20,9 +19,54 @@ import (
 
 // == INTERFACE ===============================================================
 
-var _ StoreInterface = (*storeImplementation)(nil)
+type StoreInterface interface {
+	// GetSessionTableName returns the session table name
+	GetSessionTableName() string
+	// SetSessionTableName sets the session table name
+	SetSessionTableName(sessionTableName string)
+	// GetTimeoutSeconds returns the session timeout in seconds
+	GetTimeoutSeconds() int64
+	// SetTimeoutSeconds sets the session timeout in seconds
+	SetTimeoutSeconds(timeoutSeconds int64)
+
+	// MigrateDown drops the session table
+	MigrateDown(ctx context.Context, tx ...*sql.Tx) error
+	// MigrateUp creates the session table
+	MigrateUp(ctx context.Context, tx ...*sql.Tx) error
+
+	EnableDebug(debug bool)
+	SessionExpiryGoroutine(ctx context.Context) error
+	GetDB() *sql.DB
+
+	// Old API
+	Set(ctx context.Context, key string, value string, seconds int64, options SessionOptionsInterface) error
+	Get(ctx context.Context, key string, defaultValue string, options SessionOptionsInterface) (string, error)
+	GetMap(ctx context.Context, key string, defaultValue map[string]any, options SessionOptionsInterface) (map[string]any, error)
+	GetAny(ctx context.Context, key string, defaultValue any, options SessionOptionsInterface) (any, error)
+	Delete(ctx context.Context, key string, options SessionOptionsInterface) error
+	Extend(ctx context.Context, key string, seconds int64, options SessionOptionsInterface) error
+	Has(ctx context.Context, key string, options SessionOptionsInterface) (bool, error)
+	MergeMap(ctx context.Context, key string, value map[string]any, seconds int64, options SessionOptionsInterface) error
+	SetAny(ctx context.Context, key string, value any, seconds int64, options SessionOptionsInterface) error
+	SetMap(ctx context.Context, key string, value map[string]any, seconds int64, options SessionOptionsInterface) error
+
+	// New API
+	SessionCount(ctx context.Context, query SessionQueryInterface) (int64, error)
+	SessionCreate(ctx context.Context, session SessionInterface) error
+	SessionDelete(ctx context.Context, session SessionInterface) error
+	SessionDeleteByID(ctx context.Context, sessionID string) error
+	SessionExtend(ctx context.Context, session SessionInterface, seconds int64) error
+	SessionFindByID(ctx context.Context, sessionID string, options ...SessionOptionsInterface) (SessionInterface, error)
+	SessionFindByKey(ctx context.Context, sessionKey string, options ...SessionOptionsInterface) (SessionInterface, error)
+	SessionList(ctx context.Context, query SessionQueryInterface) ([]SessionInterface, error)
+	SessionSoftDelete(ctx context.Context, session SessionInterface) error
+	SessionSoftDeleteByID(ctx context.Context, sessionID string) error
+	SessionUpdate(ctx context.Context, session SessionInterface) error
+}
 
 // == TYPE ====================================================================
+
+var _ StoreInterface = (*storeImplementation)(nil)
 
 // storeImplementation implements StoreInterface for session operations.
 type storeImplementation struct {
@@ -284,76 +328,72 @@ func (st *storeImplementation) GetMap(ctx context.Context, key string, defaultVa
 	return defaultValue, nil
 }
 
-// Has checks if a session with the given key exists.
-func (st *storeImplementation) Has(ctx context.Context, sessionKey string, options SessionOptionsInterface) (bool, error) {
-	if sessionKey == "" {
-		return false, errors.New("session store: session key is required")
-	}
-
-	query := SessionQuery().
-		SetKey(sessionKey).
-		SetExpiresAtGte(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC)).
-		SetLimit(1)
-
-	if options.HasIPAddress() {
-		query.SetUserIpAddress(options.GetIPAddress())
-	}
-	if options.HasUserAgent() {
-		query.SetUserAgent(options.GetUserAgent())
-	}
-	if options.HasUserID() {
-		query.SetUserID(options.GetUserID())
-	}
-
-	count, err := st.SessionCount(ctx, query)
+// Has checks if a session exists.
+func (st *storeImplementation) Has(ctx context.Context, key string, options SessionOptionsInterface) (bool, error) {
+	session, err := st.SessionFindByKey(ctx, key, options)
 	if err != nil {
 		return false, err
 	}
-	return count > 0, nil
+	return session != nil, nil
 }
 
-// MergeMap merges the given map into the existing session value map.
-func (st *storeImplementation) MergeMap(ctx context.Context, key string, mergeMap map[string]any, seconds int64, options SessionOptionsInterface) error {
-	currentMap, err := st.GetMap(ctx, key, nil, options)
-	if err != nil {
-		return err
-	}
-	if currentMap == nil {
-		return errors.New("session store: nil map found")
-	}
-	for k, v := range mergeMap {
-		currentMap[k] = v
-	}
-	return st.SetMap(ctx, key, currentMap, seconds, options)
-}
-
-// Set sets a session key/value pair, creating or updating as needed.
-func (st *storeImplementation) Set(ctx context.Context, sessionKey string, value string, seconds int64, options SessionOptionsInterface) error {
-	session, err := st.SessionFindByKey(ctx, sessionKey, options)
+// MergeMap merges a map into an existing session value.
+func (st *storeImplementation) MergeMap(ctx context.Context, key string, value map[string]any, seconds int64, options SessionOptionsInterface) error {
+	session, err := st.SessionFindByKey(ctx, key, options)
 	if err != nil {
 		return err
 	}
 
-	expiresAt := carbon.Now(carbon.UTC).AddSeconds(cast.ToInt(seconds)).ToDateTimeString(carbon.UTC)
+	var existingValue map[string]any
+	if session != nil {
+		jsonValue, err := st.decryptValue(session.GetValue())
+		if err != nil {
+			return err
+		}
+		if jsonValue != "" {
+			if err := json.Unmarshal([]byte(jsonValue), &existingValue); err != nil {
+				return err
+			}
+		}
+	}
+
+	if existingValue == nil {
+		existingValue = make(map[string]any)
+	}
+
+	for k, v := range value {
+		existingValue[k] = v
+	}
+
+	return st.SetMap(ctx, key, existingValue, seconds, options)
+}
+
+// Set stores a value in the session with a TTL.
+func (st *storeImplementation) Set(ctx context.Context, key string, value string, seconds int64, options SessionOptionsInterface) error {
+	session, err := st.SessionFindByKey(ctx, key, options)
+	if err != nil {
+		return err
+	}
+
+	encryptedValue, err := st.encryptValue(value)
+	if err != nil {
+		return err
+	}
 
 	if session == nil {
-		newSession := NewSession().
-			SetKey(sessionKey).
-			SetValue(value).
-			SetUserID(options.GetUserID()).
-			SetUserAgent(options.GetUserAgent()).
-			SetIPAddress(options.GetIPAddress()).
-			SetExpiresAt(expiresAt)
+		newSession := NewSession()
+		newSession.SetKey(key)
+		newSession.SetValue(encryptedValue)
+		newSession.SetExpiresAt(carbon.Now(carbon.UTC).AddSeconds(cast.ToInt(seconds)).ToDateTimeString(carbon.UTC))
 		return st.SessionCreate(ctx, newSession)
 	}
 
-	session.SetValue(value)
-	session.SetExpiresAt(expiresAt)
-	session.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
+	session.SetValue(encryptedValue)
+	session.SetExpiresAt(carbon.Now(carbon.UTC).AddSeconds(cast.ToInt(seconds)).ToDateTimeString(carbon.UTC))
 	return st.SessionUpdate(ctx, session)
 }
 
-// SetAny sets a session value by serializing the supplied interface to JSON.
+// SetAny stores an interface{} value as JSON in the session.
 func (st *storeImplementation) SetAny(ctx context.Context, key string, value any, seconds int64, options SessionOptionsInterface) error {
 	jsonValue, err := json.Marshal(value)
 	if err != nil {
@@ -362,7 +402,7 @@ func (st *storeImplementation) SetAny(ctx context.Context, key string, value any
 	return st.Set(ctx, key, string(jsonValue), seconds, options)
 }
 
-// SetMap sets a session value by serializing the supplied map to JSON.
+// SetMap stores a map[string]any value as JSON in the session.
 func (st *storeImplementation) SetMap(ctx context.Context, key string, value map[string]any, seconds int64, options SessionOptionsInterface) error {
 	jsonValue, err := json.Marshal(value)
 	if err != nil {
@@ -373,22 +413,17 @@ func (st *storeImplementation) SetMap(ctx context.Context, key string, value map
 
 // == NEW API =================================================================
 
-// SessionCount returns the count of sessions matching the query.
+// SessionCount counts sessions based on a query.
 func (st *storeImplementation) SessionCount(ctx context.Context, query SessionQueryInterface) (int64, error) {
-	if query == nil {
-		return -1, errors.New("session store: session query is nil")
-	}
-	if err := query.Validate(); err != nil {
-		return -1, err
+	if ctx == nil {
+		return 0, errors.New("ctx is nil")
 	}
 
 	q := st.buildQuery(query)
 
 	var count int64
-	if err := q.Table(st.sessionTableName).Count(&count); err != nil {
-		return -1, err
-	}
-	return count, nil
+	err := q.Table(st.sessionTableName).Count(&count)
+	return count, err
 }
 
 // SessionCreate creates a new session.
@@ -534,13 +569,10 @@ func (st *storeImplementation) SessionFindByKey(ctx context.Context, sessionKey 
 	return nil, nil
 }
 
-// SessionList returns a list of sessions matching the query.
+// SessionList lists sessions based on a query.
 func (st *storeImplementation) SessionList(ctx context.Context, query SessionQueryInterface) ([]SessionInterface, error) {
-	if query == nil {
-		return []SessionInterface{}, errors.New("session store: session query is nil")
-	}
-	if err := query.Validate(); err != nil {
-		return []SessionInterface{}, err
+	if ctx == nil {
+		return nil, errors.New("ctx is nil")
 	}
 
 	type sessionRow struct {
@@ -597,139 +629,114 @@ func (st *storeImplementation) SessionSoftDelete(ctx context.Context, s SessionI
 	if s == nil {
 		return errors.New("session is nil")
 	}
+
 	s.SetSoftDeletedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
-	return st.SessionUpdate(ctx, s)
+
+	row := map[string]any{
+		COLUMN_SOFT_DELETED_AT: s.GetSoftDeletedAtCarbon().StdTime(),
+		COLUMN_UPDATED_AT:      carbon.Now(carbon.UTC).StdTime(),
+	}
+
+	_, err := st.db.Query().Table(st.sessionTableName).Where(COLUMN_ID+" = ?", s.GetID()).Update(row)
+	return err
 }
 
 // SessionSoftDeleteByID soft-deletes a session by ID.
 func (st *storeImplementation) SessionSoftDeleteByID(ctx context.Context, id string) error {
-	s, err := st.SessionFindByID(ctx, id)
-	if err != nil {
-		return err
+	if ctx == nil {
+		return errors.New("ctx is nil")
 	}
-	return st.SessionSoftDelete(ctx, s)
+	if id == "" {
+		return errors.New("session id is empty")
+	}
+
+	softDeletedAt := carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC)
+
+	row := map[string]any{
+		COLUMN_SOFT_DELETED_AT: carbon.Parse(softDeletedAt, carbon.UTC).StdTime(),
+		COLUMN_UPDATED_AT:      carbon.Now(carbon.UTC).StdTime(),
+	}
+
+	_, err := st.db.Query().Table(st.sessionTableName).Where(COLUMN_ID+" = ?", id).Update(row)
+	return err
 }
 
-// SessionUpdate updates an existing session.
+// SessionUpdate updates a session.
 func (st *storeImplementation) SessionUpdate(ctx context.Context, s SessionInterface) error {
 	if s == nil {
-		return errors.New("session store: session cannot be nil")
+		return errors.New("session is nil")
 	}
-	if st.db == nil {
-		return errors.New("session store: db cannot be nil")
-	}
-
-	s.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
 
 	encryptedValue, err := st.encryptValue(s.GetValue())
 	if err != nil {
 		return err
 	}
 
-	updateData := map[string]any{
-		COLUMN_SESSION_KEY:     s.GetKey(),
-		COLUMN_USER_ID:         s.GetUserID(),
-		COLUMN_IP_ADDRESS:      s.GetIPAddress(),
-		COLUMN_USER_AGENT:      s.GetUserAgent(),
-		COLUMN_SESSION_VALUE:   encryptedValue,
-		COLUMN_EXPIRES_AT:      s.GetExpiresAtCarbon().StdTime(),
-		COLUMN_UPDATED_AT:      s.GetUpdatedAtCarbon().StdTime(),
-		COLUMN_SOFT_DELETED_AT: s.GetSoftDeletedAtCarbon().StdTime(),
+	row := map[string]any{
+		COLUMN_SESSION_VALUE: encryptedValue,
+		COLUMN_UPDATED_AT:    carbon.Now(carbon.UTC).StdTime(),
+		COLUMN_EXPIRES_AT:    s.GetExpiresAtCarbon().StdTime(),
 	}
 
-	_, err = st.db.Query().
-		Table(st.sessionTableName).
-		Where(COLUMN_ID+" = ?", s.GetID()).
-		Update(updateData)
+	_, err = st.db.Query().Table(st.sessionTableName).Where(COLUMN_ID+" = ?", s.GetID()).Update(row)
 	return err
 }
 
-// == HELPERS =================================================================
+// == QUERY BUILDER ==========================================================
 
-// buildQuery converts a SessionQueryInterface into a neat ORM query.
-// Datetime values are passed as time.Time so the ORM driver formats them
-// in the correct dialect-specific format (e.g. RFC3339 for SQLite).
-func (st *storeImplementation) buildQuery(options SessionQueryInterface) contractsorm.Query {
+// buildQuery builds a neat query from the session query interface.
+func (st *storeImplementation) buildQuery(query SessionQueryInterface) contractsorm.Query {
 	q := st.db.Query()
 
-	if options.HasCreatedAtGte() {
-		q = q.Where(COLUMN_CREATED_AT+" >= ?", carbon.Parse(options.CreatedAtGte(), carbon.UTC).StdTime())
-	}
-	if options.HasCreatedAtLte() {
-		q = q.Where(COLUMN_CREATED_AT+" <= ?", carbon.Parse(options.CreatedAtLte(), carbon.UTC).StdTime())
+	if query == nil {
+		return q
 	}
 
-	if options.HasExpiresAtGte() {
-		q = q.Where(COLUMN_EXPIRES_AT+" >= ?", carbon.Parse(options.ExpiresAtGte(), carbon.UTC).StdTime())
-	}
-	if options.HasExpiresAtLte() {
-		q = q.Where(COLUMN_EXPIRES_AT+" <= ?", carbon.Parse(options.ExpiresAtLte(), carbon.UTC).StdTime())
+	if query.HasKey() && query.Key() != "" {
+		q = q.Where(COLUMN_SESSION_KEY+" = ?", query.Key())
 	}
 
-	if options.HasID() {
-		q = q.Where(COLUMN_ID+" = ?", options.ID())
+	if query.HasUserID() && query.UserID() != "" {
+		q = q.Where(COLUMN_USER_ID+" = ?", query.UserID())
 	}
 
-	if options.HasIDIn() {
-		ids := make([]any, len(options.IDIn()))
-		for i, id := range options.IDIn() {
-			ids[i] = id
-		}
-		q = q.WhereIn(COLUMN_ID, ids)
+	if query.HasUserIpAddress() && query.UserIpAddress() != "" {
+		q = q.Where(COLUMN_IP_ADDRESS+" = ?", query.UserIpAddress())
 	}
 
-	if options.HasKey() {
-		q = q.Where(COLUMN_SESSION_KEY+" = ?", options.Key())
+	if query.HasUserAgent() && query.UserAgent() != "" {
+		q = q.Where(COLUMN_USER_AGENT+" = ?", query.UserAgent())
 	}
 
-	if options.HasUserAgent() {
-		q = q.Where(COLUMN_USER_AGENT+" = ?", options.UserAgent())
+	if query.HasLimit() && query.Limit() > 0 {
+		q = q.Limit(query.Limit())
 	}
 
-	if options.HasUserID() {
-		q = q.Where(COLUMN_USER_ID+" = ?", options.UserID())
+	if query.HasOffset() && query.Offset() > 0 {
+		q = q.Offset(query.Offset())
 	}
 
-	if options.HasUserIpAddress() {
-		q = q.Where(COLUMN_IP_ADDRESS+" = ?", options.UserIpAddress())
-	}
-
-	if options.HasLimit() {
-		q = q.Limit(options.Limit())
-	}
-
-	if options.HasOffset() {
-		q = q.Offset(options.Offset())
-	}
-
-	if options.HasOrderBy() && options.OrderBy() != "" {
-		direction := "desc"
-		if options.HasSortOrder() && strings.EqualFold(options.SortOrder(), "asc") {
-			direction = "asc"
-		}
-		q = q.OrderBy(options.OrderBy(), direction)
-	}
-
-	if !options.SoftDeletedIncluded() {
-		// Exclude soft-deleted rows: soft_deleted_at must be in the future.
-		// Pass time.Time so the driver serialises it in the correct format.
-		q = q.Where(COLUMN_SOFT_DELETED_AT+" > ?", time.Now().UTC())
+	// Handle soft delete filtering
+	if query.HasSoftDeletedIncluded() && query.SoftDeletedIncluded() {
+		q = q.WithSoftDeleted()
 	}
 
 	return q
 }
 
-// encryptValue encrypts the session value if an encryptor is configured.
+// == ENCRYPTION ==============================================================
+
+// encryptValue encrypts a value if encryption is enabled.
 func (st *storeImplementation) encryptValue(value string) (string, error) {
-	if st == nil || st.encryptor == nil {
+	if st.encryptor == nil {
 		return value, nil
 	}
 	return st.encryptor.encrypt(value)
 }
 
-// decryptValue decrypts the session value if an encryptor is configured.
+// decryptValue decrypts a value if encryption is enabled.
 func (st *storeImplementation) decryptValue(value string) (string, error) {
-	if st == nil || st.encryptor == nil {
+	if st.encryptor == nil {
 		return value, nil
 	}
 	return st.encryptor.decrypt(value)
