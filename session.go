@@ -1,10 +1,10 @@
 package sessionstore
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/dracory/neat/database/orm"
+	"github.com/dracory/neat/database/soft_delete"
 	neatuid "github.com/dracory/neat/support/uid"
 	"github.com/dromara/carbon/v2"
 )
@@ -69,8 +69,7 @@ type sessionImplementation struct {
 	ExpiresAtField time.Time `db:"expires_at"`
 	CreatedAtField orm.CreatedAt
 	UpdatedAtField orm.UpdatedAt
-	orm.SoftDeletes
-	DeletedAt sql.NullTime `db:"soft_deleted_at"`
+	soft_delete.SoftDeletesMaxDate
 }
 
 // == CONSTRUCTORS ============================================================
@@ -124,10 +123,7 @@ func (o *sessionImplementation) IsExpired() bool {
 
 // IsSoftDeleted returns true if the session is soft deleted.
 func (o *sessionImplementation) IsSoftDeleted() bool {
-	if !o.DeletedAt.Valid {
-		return false
-	}
-	return o.DeletedAt.Time.Before(time.Now().UTC())
+	return o.SoftDeletedAt.Before(time.Now().UTC())
 }
 
 // == SETTERS AND GETTERS =====================================================
@@ -266,27 +262,23 @@ func (o *sessionImplementation) SetUpdatedAt(updatedAt string) SessionInterface 
 
 // GetSoftDeletedAt returns the soft deleted at time of the session as a string.
 func (o *sessionImplementation) GetSoftDeletedAt() string {
-	if !o.DeletedAt.Valid || o.DeletedAt.Time.IsZero() {
+	if o.SoftDeletedAt.IsZero() {
 		return ""
 	}
-	return carbon.CreateFromStdTime(o.DeletedAt.Time).ToDateTimeString()
+	return carbon.CreateFromStdTime(o.SoftDeletedAt).ToDateTimeString()
 }
 
 // GetSoftDeletedAtCarbon returns the soft deleted at time of the session as a carbon object.
 func (o *sessionImplementation) GetSoftDeletedAtCarbon() *carbon.Carbon {
-	if !o.DeletedAt.Valid {
-		return carbon.CreateFromStdTime(time.Time{})
-	}
-	return carbon.CreateFromStdTime(o.DeletedAt.Time)
+	return carbon.CreateFromStdTime(o.SoftDeletedAt)
 }
 
 // SetSoftDeletedAt sets the soft deleted at time of the session.
 func (o *sessionImplementation) SetSoftDeletedAt(deletedAt string) SessionInterface {
 	if deletedAt == "" {
-		o.DeletedAt = sql.NullTime{Valid: false}
+		o.SoftDeletedAt = time.Time{}
 		return o
 	}
-	t := carbon.Parse(deletedAt, carbon.UTC).StdTime()
-	o.DeletedAt = sql.NullTime{Time: t, Valid: true}
+	o.SoftDeletedAt = carbon.Parse(deletedAt, carbon.UTC).StdTime()
 	return o
 }

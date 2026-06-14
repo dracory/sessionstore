@@ -576,16 +576,16 @@ func (st *storeImplementation) SessionList(ctx context.Context, query SessionQue
 	}
 
 	type sessionRow struct {
-		ID            string     `db:"id"`
-		Key           string     `db:"session_key"`
-		UserID        string     `db:"user_id"`
-		IPAddress     string     `db:"ip_address"`
-		UserAgent     string     `db:"user_agent"`
-		Value         string     `db:"session_value"`
-		ExpiresAt     time.Time  `db:"expires_at"`
-		CreatedAt     time.Time  `db:"created_at"`
-		UpdatedAt     time.Time  `db:"updated_at"`
-		SoftDeletedAt *time.Time `db:"soft_deleted_at"`
+		ID            string    `db:"id"`
+		Key           string    `db:"session_key"`
+		UserID        string    `db:"user_id"`
+		IPAddress     string    `db:"ip_address"`
+		UserAgent     string    `db:"user_agent"`
+		Value         string    `db:"session_value"`
+		ExpiresAt     time.Time `db:"expires_at"`
+		CreatedAt     time.Time `db:"created_at"`
+		UpdatedAt     time.Time `db:"updated_at"`
+		SoftDeletedAt time.Time `db:"soft_deleted_at"`
 	}
 
 	q := st.buildQuery(query)
@@ -612,9 +612,7 @@ func (st *storeImplementation) SessionList(ctx context.Context, query SessionQue
 		s.ExpiresAtField = r.ExpiresAt
 		s.CreatedAtField.CreatedAt = r.CreatedAt
 		s.UpdatedAtField.UpdatedAt = r.UpdatedAt
-		if r.SoftDeletedAt != nil {
-			s.DeletedAt = sql.NullTime{Time: *r.SoftDeletedAt, Valid: true}
-		}
+		s.SoftDeletedAt = r.SoftDeletedAt
 		list = append(list, s)
 	}
 
