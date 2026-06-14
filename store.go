@@ -719,6 +719,9 @@ func (st *storeImplementation) buildQuery(query SessionQueryInterface) contracts
 	// Handle soft delete filtering
 	if query.HasSoftDeletedIncluded() && query.SoftDeletedIncluded() {
 		q = q.WithSoftDeleted()
+	} else {
+		// By default, filter out soft-deleted records
+		q = q.Where(COLUMN_SOFT_DELETED_AT+" = ?", carbon.Parse(MAX_DATETIME, carbon.UTC).StdTime())
 	}
 
 	return q
