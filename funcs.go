@@ -1,14 +1,24 @@
 package sessionstore
 
 import (
-	"github.com/dracory/str"
+	"crypto/rand"
+	"math/big"
 )
 
+const sessionKeyGamma = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+// generateSessionKey generates a cryptographically random session key of the given length.
 func generateSessionKey(keyLength int) string {
-	gamma := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	key, err := str.RandomFromGamma(keyLength, gamma)
-	if err != nil {
-		key = str.Random(32)
+	gammaLen := big.NewInt(int64(len(sessionKeyGamma)))
+	buf := make([]byte, keyLength)
+	for i := range buf {
+		n, err := rand.Int(rand.Reader, gammaLen)
+		if err != nil {
+			// fallback: use index mod gamma length
+			buf[i] = sessionKeyGamma[i%len(sessionKeyGamma)]
+			continue
+		}
+		buf[i] = sessionKeyGamma[n.Int64()]
 	}
-	return key
+	return string(buf)
 }

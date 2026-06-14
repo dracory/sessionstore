@@ -1,12 +1,18 @@
 package sessionstore
 
-const COLUMN_CREATED_AT = "created_at"
-const COLUMN_EXPIRES_AT = "expires_at"
-const COLUMN_ID = "id"
-const COLUMN_IP_ADDRESS = "ip_address"
-const COLUMN_SESSION_KEY = "session_key"
-const COLUMN_SESSION_VALUE = "session_value"
-const COLUMN_SOFT_DELETED_AT = "soft_deleted_at"
-const COLUMN_UPDATED_AT = "updated_at"
-const COLUMN_USER_AGENT = "user_agent"
-const COLUMN_USER_ID = "user_id"
+// Column names for the session table
+const (
+	COLUMN_CREATED_AT      = "created_at"
+	COLUMN_EXPIRES_AT      = "expires_at"
+	COLUMN_ID              = "id"
+	COLUMN_IP_ADDRESS      = "ip_address"
+	COLUMN_SESSION_KEY     = "session_key"
+	COLUMN_SESSION_VALUE   = "session_value"
+	COLUMN_SOFT_DELETED_AT = "soft_deleted_at"
+	COLUMN_UPDATED_AT      = "updated_at"
+	COLUMN_USER_AGENT      = "user_agent"
+	COLUMN_USER_ID         = "user_id"
+)
+
+// MAX_DATETIME is a far-future datetime used as the default soft-delete sentinel.
+const MAX_DATETIME = "2999-12-31 23:59:59"

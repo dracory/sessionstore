@@ -1,9 +1,11 @@
 package sessionstore
 
 import (
-	"github.com/dracory/dataobject"
-	"github.com/dracory/sb"
-	"github.com/dracory/uid"
+	"database/sql"
+	"time"
+
+	"github.com/dracory/neat/database/orm"
+	neatuid "github.com/dracory/neat/support/uid"
 	"github.com/dromara/carbon/v2"
 )
 
@@ -13,183 +15,233 @@ var _ SessionInterface = (*session)(nil)
 
 // session represents a user session.
 type session struct {
-	dataobject.DataObject
+	orm.ShortID
+
+	KeyField         string    `db:"session_key"`
+	UserIDField      string    `db:"user_id"`
+	IPAddressField   string    `db:"ip_address"`
+	UserAgentField   string    `db:"user_agent"`
+	ValueField       string    `db:"session_value"`
+	ExpiresAtField   time.Time `db:"expires_at"`
+	CreatedAtField   orm.CreatedAt
+	UpdatedAtField   orm.UpdatedAt
+	SoftDeletedField sql.NullTime `db:"soft_deleted_at"`
 }
 
 // == CONSTRUCTORS ============================================================
 
 // NewSession creates a new session.
 func NewSession() SessionInterface {
-	expiresAt := carbon.Now(carbon.UTC).AddHours(2).ToDateTimeString(carbon.UTC)
-	createdAt := carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC)
-	updatedAt := carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC)
-	deletedAt := sb.MAX_DATETIME
-	key := generateSessionKey(100)
-
-	o := (&session{})
-
-	o.SetID(uid.HumanUid()).
-		SetKey(key).
-		SetValue("").
-		SetUserID("").
-		SetUserAgent("").
-		SetIPAddress("").
-		SetExpiresAt(expiresAt).
-		SetCreatedAt(createdAt).
-		SetUpdatedAt(updatedAt).
-		SetSoftDeletedAt(deletedAt)
-
+	o := &session{}
+	o.SetID(neatuid.GenerateShortID())
+	o.SetKey(generateSessionKey(100))
+	o.SetValue("")
+	o.SetUserID("")
+	o.SetUserAgent("")
+	o.SetIPAddress("")
+	o.SetExpiresAt(carbon.Now(carbon.UTC).AddHours(2).ToDateTimeString(carbon.UTC))
+	o.SetCreatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
+	o.SetUpdatedAt(carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC))
+	o.SetSoftDeletedAt(MAX_DATETIME)
 	return o
 }
 
-// NewSessionFromExistingData creates a new session from existing data.
+// NewSessionFromExistingData creates a new session from a raw column map (e.g. query results).
 func NewSessionFromExistingData(data map[string]string) SessionInterface {
 	o := &session{}
-	o.Hydrate(data)
+	o.SetID(data[COLUMN_ID])
+	o.SetKey(data[COLUMN_SESSION_KEY])
+	o.SetUserID(data[COLUMN_USER_ID])
+	o.SetIPAddress(data[COLUMN_IP_ADDRESS])
+	o.SetUserAgent(data[COLUMN_USER_AGENT])
+	o.SetValue(data[COLUMN_SESSION_VALUE])
+	if v, ok := data[COLUMN_EXPIRES_AT]; ok {
+		o.SetExpiresAt(v)
+	}
+	if v, ok := data[COLUMN_CREATED_AT]; ok {
+		o.SetCreatedAt(v)
+	}
+	if v, ok := data[COLUMN_UPDATED_AT]; ok {
+		o.SetUpdatedAt(v)
+	}
+	if v, ok := data[COLUMN_SOFT_DELETED_AT]; ok {
+		o.SetSoftDeletedAt(v)
+	}
 	return o
 }
 
 // == METHODS =================================================================
 
-// IsExpired returns true if the session is expired
+// IsExpired returns true if the session is expired.
 func (o *session) IsExpired() bool {
-	return o.GetExpiresAtCarbon().Compare("<", carbon.Now(carbon.UTC))
+	return o.ExpiresAtField.Before(time.Now().UTC())
 }
 
-// IsSoftDeleted returns true if the session is soft deleted
+// IsSoftDeleted returns true if the session is soft deleted.
 func (o *session) IsSoftDeleted() bool {
-	return o.GetSoftDeletedAtCarbon().Compare("<", carbon.Now(carbon.UTC))
+	if !o.SoftDeletedField.Valid {
+		return false
+	}
+	return o.SoftDeletedField.Time.Before(time.Now().UTC())
 }
 
 // == SETTERS AND GETTERS =====================================================
 
-// GetCreatedAt returns the created at time of the session
-func (session *session) GetCreatedAt() string {
-	return session.Get(COLUMN_CREATED_AT)
-}
-
-// GetCreatedAtCarbon returns the created at time of the session as a carbon object
-func (session *session) GetCreatedAtCarbon() *carbon.Carbon {
-	return carbon.Parse(session.GetCreatedAt(), carbon.UTC)
-}
-
-// SetCreatedAt sets the created at time of the session
-func (session *session) SetCreatedAt(createdAt string) SessionInterface {
-	session.Set(COLUMN_CREATED_AT, createdAt)
-	return session
-}
-
-// GetSoftDeletedAt returns the soft deleted at time of the session
-func (session *session) GetSoftDeletedAt() string {
-	return session.Get(COLUMN_SOFT_DELETED_AT)
-}
-
-// GetSoftDeletedAtCarbon returns the soft deleted at time of the session as a carbon object.
-func (session *session) GetSoftDeletedAtCarbon() *carbon.Carbon {
-	return carbon.Parse(session.GetSoftDeletedAt(), carbon.UTC)
-}
-
-// SetSoftDeletedAt sets the soft deleted at time of the session.
-func (session *session) SetSoftDeletedAt(DeletedAt string) SessionInterface {
-	session.Set(COLUMN_SOFT_DELETED_AT, DeletedAt)
-	return session
-}
-
-// GetExpiresAt returns the expires at time of the session.
-func (session *session) GetExpiresAt() string {
-	return session.Get(COLUMN_EXPIRES_AT)
-}
-
-// GetExpiresAtCarbon returns the expires at time of the session as a carbon object.
-func (session *session) GetExpiresAtCarbon() *carbon.Carbon {
-	return carbon.Parse(session.GetExpiresAt(), carbon.UTC)
-}
-
-// SetExpiresAt sets the expires at time of the session.
-func (session *session) SetExpiresAt(expiresAt string) SessionInterface {
-	session.Set(COLUMN_EXPIRES_AT, expiresAt)
-	return session
-}
-
 // GetID returns the id of the session.
-func (session *session) GetID() string {
-	return session.Get(COLUMN_ID)
+func (o *session) GetID() string {
+	return o.ShortID.ID
 }
 
 // SetID sets the id of the session.
-func (session *session) SetID(id string) SessionInterface {
-	session.Set(COLUMN_ID, id)
-	return session
-}
-
-// GetIPAddress returns the IP address of the session.
-func (session *session) GetIPAddress() string {
-	return session.Get(COLUMN_IP_ADDRESS)
-}
-
-// SetIPAddress sets the IP address of the session.
-func (session *session) SetIPAddress(iPAddress string) SessionInterface {
-	session.Set(COLUMN_IP_ADDRESS, iPAddress)
-	return session
+func (o *session) SetID(id string) SessionInterface {
+	o.ShortID.ID = id
+	return o
 }
 
 // GetKey returns the key of the session.
-func (session *session) GetKey() string {
-	return session.Get(COLUMN_SESSION_KEY)
-
+func (o *session) GetKey() string {
+	return o.KeyField
 }
 
 // SetKey sets the key of the session.
-func (session *session) SetKey(key string) SessionInterface {
-	session.Set(COLUMN_SESSION_KEY, key)
-	return session
-}
-
-// GetUpdatedAt returns the updated at time of the session.
-func (session *session) GetUpdatedAt() string {
-	return session.Get(COLUMN_UPDATED_AT)
-}
-
-// GetUpdatedAtCarbon returns the updated at time of the session as a carbon object.
-func (session *session) GetUpdatedAtCarbon() *carbon.Carbon {
-	return carbon.Parse(session.GetUpdatedAt(), carbon.UTC)
-}
-
-// SetUpdatedAt sets the updated at time of the session.
-func (session *session) SetUpdatedAt(UpdatedAt string) SessionInterface {
-	session.Set(COLUMN_UPDATED_AT, UpdatedAt)
-	return session
-}
-
-// GetUserAgent returns the user agent of the session.
-func (session *session) GetUserAgent() string {
-	return session.Get(COLUMN_USER_AGENT)
-}
-
-// SetUserAgent sets the user agent of the session.
-func (session *session) SetUserAgent(userAgent string) SessionInterface {
-	session.Set(COLUMN_USER_AGENT, userAgent)
-	return session
+func (o *session) SetKey(key string) SessionInterface {
+	o.KeyField = key
+	return o
 }
 
 // GetUserID returns the user id of the session.
-func (session *session) GetUserID() string {
-	return session.Get(COLUMN_USER_ID)
+func (o *session) GetUserID() string {
+	return o.UserIDField
 }
 
 // SetUserID sets the user id of the session.
-func (session *session) SetUserID(userID string) SessionInterface {
-	session.Set(COLUMN_USER_ID, userID)
-	return session
+func (o *session) SetUserID(userID string) SessionInterface {
+	o.UserIDField = userID
+	return o
+}
+
+// GetIPAddress returns the IP address of the session.
+func (o *session) GetIPAddress() string {
+	return o.IPAddressField
+}
+
+// SetIPAddress sets the IP address of the session.
+func (o *session) SetIPAddress(iPAddress string) SessionInterface {
+	o.IPAddressField = iPAddress
+	return o
+}
+
+// GetUserAgent returns the user agent of the session.
+func (o *session) GetUserAgent() string {
+	return o.UserAgentField
+}
+
+// SetUserAgent sets the user agent of the session.
+func (o *session) SetUserAgent(userAgent string) SessionInterface {
+	o.UserAgentField = userAgent
+	return o
 }
 
 // GetValue returns the value of the session.
-func (session *session) GetValue() string {
-	return session.Get(COLUMN_SESSION_VALUE)
+func (o *session) GetValue() string {
+	return o.ValueField
 }
 
 // SetValue sets the value of the session.
-func (session *session) SetValue(value string) SessionInterface {
-	session.Set(COLUMN_SESSION_VALUE, value)
-	return session
+func (o *session) SetValue(value string) SessionInterface {
+	o.ValueField = value
+	return o
+}
+
+// GetExpiresAt returns the expires at time of the session as a string.
+func (o *session) GetExpiresAt() string {
+	if o.ExpiresAtField.IsZero() {
+		return ""
+	}
+	return carbon.CreateFromStdTime(o.ExpiresAtField).ToDateTimeString()
+}
+
+// GetExpiresAtCarbon returns the expires at time of the session as a carbon object.
+func (o *session) GetExpiresAtCarbon() *carbon.Carbon {
+	return carbon.CreateFromStdTime(o.ExpiresAtField)
+}
+
+// SetExpiresAt sets the expires at time of the session.
+func (o *session) SetExpiresAt(expiresAt string) SessionInterface {
+	if expiresAt == "" {
+		return o
+	}
+	o.ExpiresAtField = carbon.Parse(expiresAt, carbon.UTC).StdTime()
+	return o
+}
+
+// GetCreatedAt returns the created at time of the session.
+func (o *session) GetCreatedAt() string {
+	if o.CreatedAtField.CreatedAt.IsZero() {
+		return ""
+	}
+	return carbon.CreateFromStdTime(o.CreatedAtField.CreatedAt).ToDateTimeString()
+}
+
+// GetCreatedAtCarbon returns the created at time of the session as a carbon object.
+func (o *session) GetCreatedAtCarbon() *carbon.Carbon {
+	return carbon.CreateFromStdTime(o.CreatedAtField.CreatedAt)
+}
+
+// SetCreatedAt sets the created at time of the session.
+func (o *session) SetCreatedAt(createdAt string) SessionInterface {
+	if createdAt == "" {
+		return o
+	}
+	o.CreatedAtField.CreatedAt = carbon.Parse(createdAt, carbon.UTC).StdTime()
+	return o
+}
+
+// GetUpdatedAt returns the updated at time of the session.
+func (o *session) GetUpdatedAt() string {
+	if o.UpdatedAtField.UpdatedAt.IsZero() {
+		return ""
+	}
+	return carbon.CreateFromStdTime(o.UpdatedAtField.UpdatedAt).ToDateTimeString()
+}
+
+// GetUpdatedAtCarbon returns the updated at time of the session as a carbon object.
+func (o *session) GetUpdatedAtCarbon() *carbon.Carbon {
+	return carbon.CreateFromStdTime(o.UpdatedAtField.UpdatedAt)
+}
+
+// SetUpdatedAt sets the updated at time of the session.
+func (o *session) SetUpdatedAt(updatedAt string) SessionInterface {
+	if updatedAt == "" {
+		return o
+	}
+	o.UpdatedAtField.UpdatedAt = carbon.Parse(updatedAt, carbon.UTC).StdTime()
+	return o
+}
+
+// GetSoftDeletedAt returns the soft deleted at time of the session as a string.
+func (o *session) GetSoftDeletedAt() string {
+	if !o.SoftDeletedField.Valid || o.SoftDeletedField.Time.IsZero() {
+		return ""
+	}
+	return carbon.CreateFromStdTime(o.SoftDeletedField.Time).ToDateTimeString()
+}
+
+// GetSoftDeletedAtCarbon returns the soft deleted at time of the session as a carbon object.
+func (o *session) GetSoftDeletedAtCarbon() *carbon.Carbon {
+	if !o.SoftDeletedField.Valid {
+		return carbon.CreateFromStdTime(time.Time{})
+	}
+	return carbon.CreateFromStdTime(o.SoftDeletedField.Time)
+}
+
+// SetSoftDeletedAt sets the soft deleted at time of the session.
+func (o *session) SetSoftDeletedAt(deletedAt string) SessionInterface {
+	if deletedAt == "" {
+		o.SoftDeletedField = sql.NullTime{Valid: false}
+		return o
+	}
+	t := carbon.Parse(deletedAt, carbon.UTC).StdTime()
+	o.SoftDeletedField = sql.NullTime{Time: t, Valid: true}
+	return o
 }

@@ -2,13 +2,8 @@ package sessionstore
 
 import "github.com/dromara/carbon/v2"
 
+// SessionInterface defines the interface for a session record.
 type SessionInterface interface {
-	// From data object
-
-	Data() map[string]string
-	DataChanged() map[string]string
-	MarkAsNotDirty(...string)
-
 	// Methods
 
 	IsExpired() bool

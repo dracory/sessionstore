@@ -3,7 +3,6 @@ package sessionstore
 import (
 	"testing"
 
-	"github.com/dracory/sb"
 	"github.com/dromara/carbon/v2"
 )
 
@@ -47,7 +46,7 @@ func TestNewSession_DefaultValues(t *testing.T) {
 		t.Fatalf("expected session not to be soft deleted")
 	}
 
-	if sess.GetSoftDeletedAt() != sb.MAX_DATETIME {
+	if sess.GetSoftDeletedAt() != MAX_DATETIME {
 		t.Fatalf("expected soft deleted at to be MAX_DATETIME")
 	}
 }

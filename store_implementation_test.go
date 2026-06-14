@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dracory/sb"
 	"github.com/dromara/carbon/v2"
 	_ "modernc.org/sqlite"
 )
@@ -261,7 +260,7 @@ func TestStore_SessionCreate(t *testing.T) {
 		t.Fatal("unexpected empty id:", session.GetID())
 	}
 
-	if len(session.GetID()) != 32 {
+	if len(session.GetID()) < 8 {
 		t.Fatal("unexpected id length:", len(session.GetID()))
 	}
 
@@ -387,6 +386,7 @@ func TestStore_SessionExtend(t *testing.T) {
 		t.Fatal("unexpected empty expiresAt:", session.GetExpiresAt())
 	}
 
+	originalExpiresAt := session.GetExpiresAt()
 	newExpiresAt := session.GetExpiresAtCarbon().AddSeconds(100)
 
 	if session.GetExpiresAtCarbon().Gte(newExpiresAt) {
@@ -425,8 +425,8 @@ func TestStore_SessionExtend(t *testing.T) {
 		t.Fatal("unexpected empty expiresAt:", session.GetExpiresAt())
 	}
 
-	if sessionExtended.GetExpiresAt() == session.GetExpiresAt() {
-		t.Fatal("unexpected same expiresAt:", session.GetExpiresAt())
+	if sessionExtended.GetExpiresAt() == originalExpiresAt {
+		t.Fatal("unexpected same expiresAt:", originalExpiresAt)
 	}
 
 	if sessionExtended.GetExpiresAt() == sessionExtended.GetCreatedAt() {
@@ -604,7 +604,7 @@ func TestStore_SessionSoftDelete(t *testing.T) {
 		t.Fatal("unexpected error:", err)
 	}
 
-	if session.GetSoftDeletedAt() != sb.MAX_DATETIME {
+	if session.GetSoftDeletedAt() != MAX_DATETIME {
 		t.Fatal("Session MUST NOT be soft deleted")
 	}
 
@@ -631,7 +631,7 @@ func TestStore_SessionSoftDelete(t *testing.T) {
 		t.Fatal("Exam MUST be soft deleted")
 	}
 
-	if strings.Contains(sessionFindWithSoftDeleted[0].GetSoftDeletedAt(), sb.MAX_DATETIME) {
+	if strings.Contains(sessionFindWithSoftDeleted[0].GetSoftDeletedAt(), MAX_DATETIME) {
 		t.Fatal("Session MUST be soft deleted", session.GetSoftDeletedAt())
 	}
 
