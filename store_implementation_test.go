@@ -604,7 +604,8 @@ func TestStore_SessionSoftDelete(t *testing.T) {
 		t.Fatal("unexpected error:", err)
 	}
 
-	if session.GetSoftDeletedAt() != MAX_DATETIME {
+	// SoftDeletesMaxDate uses zero time as the max-date sentinel
+	if !session.GetSoftDeletedAtCarbon().IsZero() {
 		t.Fatal("Session MUST NOT be soft deleted")
 	}
 
@@ -631,8 +632,10 @@ func TestStore_SessionSoftDelete(t *testing.T) {
 		t.Fatal("Exam MUST be soft deleted")
 	}
 
-	if strings.Contains(sessionFindWithSoftDeleted[0].GetSoftDeletedAt(), MAX_DATETIME) {
-		t.Fatal("Session MUST be soft deleted", session.GetSoftDeletedAt())
+	// SoftDeletesMaxDate uses zero time as the max-date sentinel for active records
+	// Soft deleted records will have a recent timestamp
+	if sessionFindWithSoftDeleted[0].GetSoftDeletedAtCarbon().IsZero() {
+		t.Fatal("Session MUST be soft deleted (should have timestamp, not zero)")
 	}
 
 	if !sessionFindWithSoftDeleted[0].IsSoftDeleted() {
