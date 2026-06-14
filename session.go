@@ -9,12 +9,12 @@ import (
 	"github.com/dromara/carbon/v2"
 )
 
-var _ SessionInterface = (*session)(nil)
+var _ SessionInterface = (*sessionImplementation)(nil)
 
 // == TYPE ===================================================================
 
-// session represents a user session.
-type session struct {
+// sessionImplementation is the private implementation of SessionInterface.
+type sessionImplementation struct {
 	orm.ShortID
 
 	KeyField         string    `db:"session_key"`
@@ -32,7 +32,7 @@ type session struct {
 
 // NewSession creates a new session.
 func NewSession() SessionInterface {
-	o := &session{}
+	o := &sessionImplementation{}
 	o.SetID(neatuid.GenerateShortID())
 	o.SetKey(generateSessionKey(100))
 	o.SetValue("")
@@ -48,7 +48,7 @@ func NewSession() SessionInterface {
 
 // NewSessionFromExistingData creates a new session from a raw column map (e.g. query results).
 func NewSessionFromExistingData(data map[string]string) SessionInterface {
-	o := &session{}
+	o := &sessionImplementation{}
 	o.SetID(data[COLUMN_ID])
 	o.SetKey(data[COLUMN_SESSION_KEY])
 	o.SetUserID(data[COLUMN_USER_ID])
@@ -73,12 +73,12 @@ func NewSessionFromExistingData(data map[string]string) SessionInterface {
 // == METHODS =================================================================
 
 // IsExpired returns true if the session is expired.
-func (o *session) IsExpired() bool {
+func (o *sessionImplementation) IsExpired() bool {
 	return o.ExpiresAtField.Before(time.Now().UTC())
 }
 
 // IsSoftDeleted returns true if the session is soft deleted.
-func (o *session) IsSoftDeleted() bool {
+func (o *sessionImplementation) IsSoftDeleted() bool {
 	if !o.SoftDeletedField.Valid {
 		return false
 	}
@@ -88,73 +88,73 @@ func (o *session) IsSoftDeleted() bool {
 // == SETTERS AND GETTERS =====================================================
 
 // GetID returns the id of the session.
-func (o *session) GetID() string {
+func (o *sessionImplementation) GetID() string {
 	return o.ShortID.ID
 }
 
 // SetID sets the id of the session.
-func (o *session) SetID(id string) SessionInterface {
+func (o *sessionImplementation) SetID(id string) SessionInterface {
 	o.ShortID.ID = id
 	return o
 }
 
 // GetKey returns the key of the session.
-func (o *session) GetKey() string {
+func (o *sessionImplementation) GetKey() string {
 	return o.KeyField
 }
 
 // SetKey sets the key of the session.
-func (o *session) SetKey(key string) SessionInterface {
+func (o *sessionImplementation) SetKey(key string) SessionInterface {
 	o.KeyField = key
 	return o
 }
 
 // GetUserID returns the user id of the session.
-func (o *session) GetUserID() string {
+func (o *sessionImplementation) GetUserID() string {
 	return o.UserIDField
 }
 
 // SetUserID sets the user id of the session.
-func (o *session) SetUserID(userID string) SessionInterface {
+func (o *sessionImplementation) SetUserID(userID string) SessionInterface {
 	o.UserIDField = userID
 	return o
 }
 
 // GetIPAddress returns the IP address of the session.
-func (o *session) GetIPAddress() string {
+func (o *sessionImplementation) GetIPAddress() string {
 	return o.IPAddressField
 }
 
 // SetIPAddress sets the IP address of the session.
-func (o *session) SetIPAddress(iPAddress string) SessionInterface {
+func (o *sessionImplementation) SetIPAddress(iPAddress string) SessionInterface {
 	o.IPAddressField = iPAddress
 	return o
 }
 
 // GetUserAgent returns the user agent of the session.
-func (o *session) GetUserAgent() string {
+func (o *sessionImplementation) GetUserAgent() string {
 	return o.UserAgentField
 }
 
 // SetUserAgent sets the user agent of the session.
-func (o *session) SetUserAgent(userAgent string) SessionInterface {
+func (o *sessionImplementation) SetUserAgent(userAgent string) SessionInterface {
 	o.UserAgentField = userAgent
 	return o
 }
 
 // GetValue returns the value of the session.
-func (o *session) GetValue() string {
+func (o *sessionImplementation) GetValue() string {
 	return o.ValueField
 }
 
 // SetValue sets the value of the session.
-func (o *session) SetValue(value string) SessionInterface {
+func (o *sessionImplementation) SetValue(value string) SessionInterface {
 	o.ValueField = value
 	return o
 }
 
 // GetExpiresAt returns the expires at time of the session as a string.
-func (o *session) GetExpiresAt() string {
+func (o *sessionImplementation) GetExpiresAt() string {
 	if o.ExpiresAtField.IsZero() {
 		return ""
 	}
@@ -162,12 +162,12 @@ func (o *session) GetExpiresAt() string {
 }
 
 // GetExpiresAtCarbon returns the expires at time of the session as a carbon object.
-func (o *session) GetExpiresAtCarbon() *carbon.Carbon {
+func (o *sessionImplementation) GetExpiresAtCarbon() *carbon.Carbon {
 	return carbon.CreateFromStdTime(o.ExpiresAtField)
 }
 
 // SetExpiresAt sets the expires at time of the session.
-func (o *session) SetExpiresAt(expiresAt string) SessionInterface {
+func (o *sessionImplementation) SetExpiresAt(expiresAt string) SessionInterface {
 	if expiresAt == "" {
 		return o
 	}
@@ -176,7 +176,7 @@ func (o *session) SetExpiresAt(expiresAt string) SessionInterface {
 }
 
 // GetCreatedAt returns the created at time of the session.
-func (o *session) GetCreatedAt() string {
+func (o *sessionImplementation) GetCreatedAt() string {
 	if o.CreatedAtField.CreatedAt.IsZero() {
 		return ""
 	}
@@ -184,12 +184,12 @@ func (o *session) GetCreatedAt() string {
 }
 
 // GetCreatedAtCarbon returns the created at time of the session as a carbon object.
-func (o *session) GetCreatedAtCarbon() *carbon.Carbon {
+func (o *sessionImplementation) GetCreatedAtCarbon() *carbon.Carbon {
 	return carbon.CreateFromStdTime(o.CreatedAtField.CreatedAt)
 }
 
 // SetCreatedAt sets the created at time of the session.
-func (o *session) SetCreatedAt(createdAt string) SessionInterface {
+func (o *sessionImplementation) SetCreatedAt(createdAt string) SessionInterface {
 	if createdAt == "" {
 		return o
 	}
@@ -198,7 +198,7 @@ func (o *session) SetCreatedAt(createdAt string) SessionInterface {
 }
 
 // GetUpdatedAt returns the updated at time of the session.
-func (o *session) GetUpdatedAt() string {
+func (o *sessionImplementation) GetUpdatedAt() string {
 	if o.UpdatedAtField.UpdatedAt.IsZero() {
 		return ""
 	}
@@ -206,12 +206,12 @@ func (o *session) GetUpdatedAt() string {
 }
 
 // GetUpdatedAtCarbon returns the updated at time of the session as a carbon object.
-func (o *session) GetUpdatedAtCarbon() *carbon.Carbon {
+func (o *sessionImplementation) GetUpdatedAtCarbon() *carbon.Carbon {
 	return carbon.CreateFromStdTime(o.UpdatedAtField.UpdatedAt)
 }
 
 // SetUpdatedAt sets the updated at time of the session.
-func (o *session) SetUpdatedAt(updatedAt string) SessionInterface {
+func (o *sessionImplementation) SetUpdatedAt(updatedAt string) SessionInterface {
 	if updatedAt == "" {
 		return o
 	}
@@ -220,7 +220,7 @@ func (o *session) SetUpdatedAt(updatedAt string) SessionInterface {
 }
 
 // GetSoftDeletedAt returns the soft deleted at time of the session as a string.
-func (o *session) GetSoftDeletedAt() string {
+func (o *sessionImplementation) GetSoftDeletedAt() string {
 	if !o.SoftDeletedField.Valid || o.SoftDeletedField.Time.IsZero() {
 		return ""
 	}
@@ -228,7 +228,7 @@ func (o *session) GetSoftDeletedAt() string {
 }
 
 // GetSoftDeletedAtCarbon returns the soft deleted at time of the session as a carbon object.
-func (o *session) GetSoftDeletedAtCarbon() *carbon.Carbon {
+func (o *sessionImplementation) GetSoftDeletedAtCarbon() *carbon.Carbon {
 	if !o.SoftDeletedField.Valid {
 		return carbon.CreateFromStdTime(time.Time{})
 	}
@@ -236,7 +236,7 @@ func (o *session) GetSoftDeletedAtCarbon() *carbon.Carbon {
 }
 
 // SetSoftDeletedAt sets the soft deleted at time of the session.
-func (o *session) SetSoftDeletedAt(deletedAt string) SessionInterface {
+func (o *sessionImplementation) SetSoftDeletedAt(deletedAt string) SessionInterface {
 	if deletedAt == "" {
 		o.SoftDeletedField = sql.NullTime{Valid: false}
 		return o

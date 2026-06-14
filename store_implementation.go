@@ -570,7 +570,7 @@ func (st *storeImplementation) SessionList(ctx context.Context, query SessionQue
 			return []SessionInterface{}, err
 		}
 
-		s := &session{}
+		s := &sessionImplementation{}
 		s.SetID(r.ID)
 		s.SetKey(r.Key)
 		s.SetUserID(r.UserID)
