@@ -581,7 +581,7 @@ func (st *storeImplementation) SessionList(ctx context.Context, query SessionQue
 		s.CreatedAtField.CreatedAt = r.CreatedAt
 		s.UpdatedAtField.UpdatedAt = r.UpdatedAt
 		if r.SoftDeletedAt != nil {
-			s.SoftDeletedField = sql.NullTime{Time: *r.SoftDeletedAt, Valid: true}
+			s.DeletedAt = sql.NullTime{Time: *r.SoftDeletedAt, Valid: true}
 		}
 		list = append(list, s)
 	}

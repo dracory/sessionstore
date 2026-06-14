@@ -17,15 +17,16 @@ var _ SessionInterface = (*sessionImplementation)(nil)
 type sessionImplementation struct {
 	orm.ShortID
 
-	KeyField         string    `db:"session_key"`
-	UserIDField      string    `db:"user_id"`
-	IPAddressField   string    `db:"ip_address"`
-	UserAgentField   string    `db:"user_agent"`
-	ValueField       string    `db:"session_value"`
-	ExpiresAtField   time.Time `db:"expires_at"`
-	CreatedAtField   orm.CreatedAt
-	UpdatedAtField   orm.UpdatedAt
-	SoftDeletedField sql.NullTime `db:"soft_deleted_at"`
+	KeyField       string    `db:"session_key"`
+	UserIDField    string    `db:"user_id"`
+	IPAddressField string    `db:"ip_address"`
+	UserAgentField string    `db:"user_agent"`
+	ValueField     string    `db:"session_value"`
+	ExpiresAtField time.Time `db:"expires_at"`
+	CreatedAtField orm.CreatedAt
+	UpdatedAtField orm.UpdatedAt
+	orm.SoftDeletes
+	DeletedAt sql.NullTime `db:"soft_deleted_at"`
 }
 
 // == CONSTRUCTORS ============================================================
@@ -79,10 +80,10 @@ func (o *sessionImplementation) IsExpired() bool {
 
 // IsSoftDeleted returns true if the session is soft deleted.
 func (o *sessionImplementation) IsSoftDeleted() bool {
-	if !o.SoftDeletedField.Valid {
+	if !o.DeletedAt.Valid {
 		return false
 	}
-	return o.SoftDeletedField.Time.Before(time.Now().UTC())
+	return o.DeletedAt.Time.Before(time.Now().UTC())
 }
 
 // == SETTERS AND GETTERS =====================================================
@@ -221,27 +222,27 @@ func (o *sessionImplementation) SetUpdatedAt(updatedAt string) SessionInterface 
 
 // GetSoftDeletedAt returns the soft deleted at time of the session as a string.
 func (o *sessionImplementation) GetSoftDeletedAt() string {
-	if !o.SoftDeletedField.Valid || o.SoftDeletedField.Time.IsZero() {
+	if !o.DeletedAt.Valid || o.DeletedAt.Time.IsZero() {
 		return ""
 	}
-	return carbon.CreateFromStdTime(o.SoftDeletedField.Time).ToDateTimeString()
+	return carbon.CreateFromStdTime(o.DeletedAt.Time).ToDateTimeString()
 }
 
 // GetSoftDeletedAtCarbon returns the soft deleted at time of the session as a carbon object.
 func (o *sessionImplementation) GetSoftDeletedAtCarbon() *carbon.Carbon {
-	if !o.SoftDeletedField.Valid {
+	if !o.DeletedAt.Valid {
 		return carbon.CreateFromStdTime(time.Time{})
 	}
-	return carbon.CreateFromStdTime(o.SoftDeletedField.Time)
+	return carbon.CreateFromStdTime(o.DeletedAt.Time)
 }
 
 // SetSoftDeletedAt sets the soft deleted at time of the session.
 func (o *sessionImplementation) SetSoftDeletedAt(deletedAt string) SessionInterface {
 	if deletedAt == "" {
-		o.SoftDeletedField = sql.NullTime{Valid: false}
+		o.DeletedAt = sql.NullTime{Valid: false}
 		return o
 	}
 	t := carbon.Parse(deletedAt, carbon.UTC).StdTime()
-	o.SoftDeletedField = sql.NullTime{Time: t, Valid: true}
+	o.DeletedAt = sql.NullTime{Time: t, Valid: true}
 	return o
 }
