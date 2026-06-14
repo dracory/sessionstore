@@ -46,9 +46,8 @@ func TestNewSession_DefaultValues(t *testing.T) {
 		t.Fatalf("expected session not to be soft deleted")
 	}
 
-	// SoftDeletesMaxDate uses zero time as the max-date sentinel
-	if !sess.GetSoftDeletedAtCarbon().IsZero() {
-		t.Fatalf("expected soft deleted at to be zero (max-date sentinel)")
+	if sess.GetSoftDeletedAt() != MAX_DATETIME {
+		t.Fatalf("expected soft deleted at to be MAX_DATETIME")
 	}
 }
 
