@@ -222,8 +222,9 @@ func (st *storeImplementation) expireSessionsOnce(ctx context.Context) error {
 		return ctx.Err()
 	}
 
-	now := time.Now().UTC()
+	now := carbon.Now(carbon.UTC).ToDateTimeString(carbon.UTC)
 	_, err := st.db.Query().
+		Model(&sessionImplementation{}).
 		Table(st.sessionTableName).
 		Where(COLUMN_EXPIRES_AT+" < ?", now).
 		Delete()
@@ -684,10 +685,19 @@ func (st *storeImplementation) SessionUpdate(ctx context.Context, s SessionInter
 
 // buildQuery builds a neat query from the session query interface.
 func (st *storeImplementation) buildQuery(query SessionQueryInterface) contractsorm.Query {
-	q := st.db.Query()
+	// Use Model() to enable neat's automatic soft delete handling via SoftDeletesMaxDate
+	q := st.db.Query().Model(&sessionImplementation{})
 
 	if query == nil {
 		return q
+	}
+
+	if query.HasID() && query.ID() != "" {
+		q = q.Where(COLUMN_ID+" = ?", query.ID())
+	}
+
+	if query.HasIDIn() && len(query.IDIn()) > 0 {
+		q = q.Where(COLUMN_ID+" IN ?", query.IDIn())
 	}
 
 	if query.HasKey() && query.Key() != "" {
@@ -706,6 +716,22 @@ func (st *storeImplementation) buildQuery(query SessionQueryInterface) contracts
 		q = q.Where(COLUMN_USER_AGENT+" = ?", query.UserAgent())
 	}
 
+	if query.HasExpiresAtGte() && query.ExpiresAtGte() != "" {
+		q = q.Where(COLUMN_EXPIRES_AT+" >= ?", query.ExpiresAtGte())
+	}
+
+	if query.HasExpiresAtLte() && query.ExpiresAtLte() != "" {
+		q = q.Where(COLUMN_EXPIRES_AT+" <= ?", query.ExpiresAtLte())
+	}
+
+	if query.HasCreatedAtGte() && query.CreatedAtGte() != "" {
+		q = q.Where(COLUMN_CREATED_AT+" >= ?", query.CreatedAtGte())
+	}
+
+	if query.HasCreatedAtLte() && query.CreatedAtLte() != "" {
+		q = q.Where(COLUMN_CREATED_AT+" <= ?", query.CreatedAtLte())
+	}
+
 	if query.HasLimit() && query.Limit() > 0 {
 		q = q.Limit(query.Limit())
 	}
@@ -714,12 +740,14 @@ func (st *storeImplementation) buildQuery(query SessionQueryInterface) contracts
 		q = q.Offset(query.Offset())
 	}
 
-	// Handle soft delete filtering
+	if query.HasOrderBy() && query.OrderBy() != "" {
+		direction := lo.CoalesceOrEmpty(query.SortOrder(), "DESC")
+		q = q.OrderBy(query.OrderBy() + " " + direction)
+	}
+
+	// Handle soft delete filtering via neat's automatic handling (SoftDeletesMaxDate)
 	if query.HasSoftDeletedIncluded() && query.SoftDeletedIncluded() {
 		q = q.WithSoftDeleted()
-	} else {
-		// By default, filter out soft-deleted records
-		q = q.Where(COLUMN_SOFT_DELETED_AT+" = ?", carbon.Parse(MAX_DATETIME, carbon.UTC).StdTime())
 	}
 
 	return q
