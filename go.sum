@@ -6,8 +6,8 @@ github.com/coder/websocket v1.8.14 h1:9L0p0iKiNOibykf283eHkKUHHrpG7f65OE3BhhO7v9
 github.com/coder/websocket v1.8.14/go.mod h1:NX3SzP+inril6yawo5CQXx8+fk145lPDC6pumgx0mVg=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/dracory/neat v0.23.0 h1:ogr9kH77ZzyfjJXh29HjWSsCfg3jt9d3kM4mFHlTjiI=
-github.com/dracory/neat v0.23.0/go.mod h1:TpQLRBHkhLZpPqDpbOnAA2TMevSA4BlmgjA133hLEyA=
+github.com/dracory/neat v0.26.0 h1:GfDrXSlMV15X3XAIx2oDRI0wHS9QUHbUwrSnduCfVRg=
+github.com/dracory/neat v0.26.0/go.mod h1:TpQLRBHkhLZpPqDpbOnAA2TMevSA4BlmgjA133hLEyA=
 github.com/dromara/carbon/v2 v2.6.16 h1:AbxrnW1kJhR3KHdS8G96NFmxDwPFyre+t+xSiJIUD1I=
 github.com/dromara/carbon/v2 v2.6.16/go.mod h1:NGo3reeV5vhWCYWcSqbJRZm46MEwyfYI5EJRdVFoLJo=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
