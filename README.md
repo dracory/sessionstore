@@ -1,4 +1,4 @@
-# Session Store <a href="https://gitpod.io/#https://github.com/dracory/sessionstore" style="float:right:"><img src="https://gitpod.io/button/open-in-gitpod.svg" alt="Open in Gitpod" loading="lazy"></a>
+# Session Store
 
 [![Tests Status](https://github.com/dracory/sessionstore/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/dracory/sessionstore/actions/workflows/test.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/dracory/sessionstore)](https://goreportcard.com/report/github.com/dracory/sessionstore)
