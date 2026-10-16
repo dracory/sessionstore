@@ -91,7 +91,7 @@ func (st *storeImplementation) MigrateUp(ctx context.Context, tx ...*sql.Tx) err
 	}
 
 	err := st.db.Schema().Create(st.sessionTableName, func(table contractsschema.Blueprint) {
-		table.String(COLUMN_ID, 21)
+		table.String(COLUMN_ID, 36)
 		table.Primary(COLUMN_ID)
 		table.String(COLUMN_SESSION_KEY, 255)
 		table.String(COLUMN_USER_ID, 40)

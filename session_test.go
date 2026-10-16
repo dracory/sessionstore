@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/dromara/carbon/v2"
+	"github.com/google/uuid"
 )
 
 func TestNewSession_DefaultValues(t *testing.T) {
@@ -11,6 +12,15 @@ func TestNewSession_DefaultValues(t *testing.T) {
 
 	if sess.GetID() == "" {
 		t.Fatalf("expected generated id")
+	}
+
+	u, err := uuid.Parse(sess.GetID())
+	if err != nil {
+		t.Fatalf("expected valid uuid, got error: %v", err)
+	}
+
+	if u.Version() != 7 {
+		t.Fatalf("expected uuid v7, got version %d", u.Version())
 	}
 
 	if len(sess.GetKey()) != 100 {

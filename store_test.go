@@ -260,7 +260,7 @@ func TestStore_SessionCreate(t *testing.T) {
 		t.Fatal("unexpected empty id:", session.GetID())
 	}
 
-	if len(session.GetID()) < 8 {
+	if len(session.GetID()) != 36 {
 		t.Fatal("unexpected id length:", len(session.GetID()))
 	}
 
