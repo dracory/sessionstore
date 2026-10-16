@@ -5,8 +5,8 @@ import (
 
 	"github.com/dracory/neat/database/orm"
 	"github.com/dracory/neat/database/soft_delete"
-	neatuid "github.com/dracory/neat/support/uid"
 	"github.com/dromara/carbon/v2"
+	"github.com/google/uuid"
 )
 
 // SessionInterface defines the interface for a session record.
@@ -59,7 +59,7 @@ var _ SessionInterface = (*sessionImplementation)(nil)
 
 // sessionImplementation is the private implementation of SessionInterface.
 type sessionImplementation struct {
-	orm.ShortID
+	orm.StringID
 
 	KeyField       string    `db:"session_key"`
 	UserIDField    string    `db:"user_id"`
@@ -77,7 +77,7 @@ type sessionImplementation struct {
 // NewSession creates a new session.
 func NewSession() SessionInterface {
 	o := &sessionImplementation{}
-	o.SetID(neatuid.GenerateShortID())
+	o.SetID(uuid.Must(uuid.NewV7()).String())
 	o.SetKey(generateSessionKey(100))
 	o.SetValue("")
 	o.SetUserID("")
@@ -130,12 +130,12 @@ func (o *sessionImplementation) IsSoftDeleted() bool {
 
 // GetID returns the id of the session.
 func (o *sessionImplementation) GetID() string {
-	return o.ShortID.ID
+	return o.StringID.ID
 }
 
 // SetID sets the id of the session.
 func (o *sessionImplementation) SetID(id string) SessionInterface {
-	o.ShortID.ID = id
+	o.StringID.ID = id
 	return o
 }
 
