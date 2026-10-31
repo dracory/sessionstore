@@ -4,8 +4,8 @@ github.com/antlr4-go/antlr/v4 v4.13.1 h1:SqQKkuVZ+zWkMMNkjy5FZe5mr5WURWnlpmOuzYW
 github.com/antlr4-go/antlr/v4 v4.13.1/go.mod h1:GKmUxMtwp6ZgGwZSva4eWPC5mS6vUAmOABFgjdkM7Nw=
 github.com/coder/websocket v1.8.15 h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=
 github.com/coder/websocket v1.8.15/go.mod h1:NX3SzP+inril6yawo5CQXx8+fk145lPDC6pumgx0mVg=
-github.com/dracory/neat v0.57.0 h1:476/rPguhUqtnzyly8QgF27Nz3vyIFWkHq//TYb7Vns=
-github.com/dracory/neat v0.57.0/go.mod h1:Nbkp2Y2FjMK1K53hQLQmw3h8FRdWwFnwv3466YONbOc=
+github.com/dracory/neat v0.60.0 h1:g1RJbH810+u7dfINYxVMcLqOPsxOI9lBlORmXPJuk/M=
+github.com/dracory/neat v0.60.0/go.mod h1:Nbkp2Y2FjMK1K53hQLQmw3h8FRdWwFnwv3466YONbOc=
 github.com/dromara/carbon/v2 v2.6.18 h1:ts3UByLjdN+r5YnPGsrtRpJWE7paKph+OHURyAw+e38=
 github.com/dromara/carbon/v2 v2.6.18/go.mod h1:GHBwozp4XxEhCri2PaInUwMi7C2QwqulfFjxC0qx6TA=
 github.com/dustin/go-humanize v1.1.0 h1:dbKTrvD0klcbBV/h4AWJdMuZogJACoMlvWIWZ5b2xWg=
