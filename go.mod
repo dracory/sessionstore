@@ -3,7 +3,7 @@ module github.com/dracory/sessionstore
 go 1.27.0
 
 require (
-	github.com/dracory/neat v0.60.0
+	github.com/dracory/neat v0.60.1
 	github.com/dromara/carbon/v2 v2.7.0
 	github.com/google/uuid v1.6.0
 	github.com/samber/lo v1.53.0
