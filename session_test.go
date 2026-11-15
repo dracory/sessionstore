@@ -2,6 +2,7 @@ package sessionstore
 
 import (
 	"testing"
+	"uuid"
 
 	"github.com/dromara/carbon/v2"
 )
@@ -11,6 +12,23 @@ func TestNewSession_DefaultValues(t *testing.T) {
 
 	if sess.GetID() == "" {
 		t.Fatalf("expected generated id")
+	}
+
+	// Verify it's a valid UUID v7 using standard library
+	id := sess.GetID()
+	u, err := uuid.Parse(id)
+	if err != nil {
+		t.Fatalf("expected valid uuid, got error: %v", err)
+	}
+
+	if len(u) != 16 {
+		t.Fatalf("expected 16 byte uuid, got %d", len(u))
+	}
+
+	// UUID v7 has version 7 in the upper 4 bits of byte 6
+	version := u[6] >> 4
+	if version != 7 {
+		t.Fatalf("expected uuid v7, got version %d", version)
 	}
 
 	if len(sess.GetKey()) != 100 {
