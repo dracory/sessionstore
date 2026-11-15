@@ -1,6 +1,6 @@
 module github.com/dracory/sessionstore
 
-go 1.27.0
+go 1.27.3
 
 require (
 	github.com/dracory/neat v0.62.2
