@@ -2,11 +2,11 @@ package sessionstore
 
 import (
 	"time"
+	"uuid"
 
 	"github.com/dracory/neat/database/orm"
 	"github.com/dracory/neat/database/soft_delete"
 	"github.com/dromara/carbon/v2"
-	"github.com/google/uuid"
 )
 
 // SessionInterface defines the interface for a session record.
@@ -77,7 +77,7 @@ type sessionImplementation struct {
 // NewSession creates a new session.
 func NewSession() SessionInterface {
 	o := &sessionImplementation{}
-	o.SetID(uuid.Must(uuid.NewV7()).String())
+	o.SetID(uuid.NewV7().String())
 	o.SetKey(generateSessionKey(100))
 	o.SetValue("")
 	o.SetUserID("")
